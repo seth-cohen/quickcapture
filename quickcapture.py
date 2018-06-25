@@ -9,10 +9,13 @@ import wiringpi as wpi
 import os
 import configparser
 from camera import Camera
+from turntable import Turntable
+import time
 
 # This is our window from QtCreator
 import mainwindow_auto
 
+app = None
 
 # create class for our Raspberry Pi GUI
 class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
@@ -25,6 +28,9 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
         config.read('/home/pi/.quickcapture.conf')
         print(config.sections())
         
+        turntable_data = config['TURNTABLE']
+        self.turntable = Turntable(int(turntable_data['TimeToRotate']), int(turntable_data['PhotosPerScan']))
+
         self.cameras = [];
         for x in range(0, 4):
             self.cameras.append(Camera(config['DEFAULTS']['Camera{}Pin'.format(x + 1)]))
@@ -46,27 +52,36 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
         for preview in self.cam_previews:
             preview.setPixmap(Gui.QPixmap(preview_image_path).scaled(preview.width(), preview.height(), Core.Qt.KeepAspectRatio))
 
-        self.inc_button.clicked.connect(self.inc_handler)
-        self.start_button.clicked.connect(self.start_handler)
+        self.initialize_button.clicked.connect(self.initialization_shot)
+        self.start_button.clicked.connect(self.start_scan)
         
-    def inc_handler(self):
-        print('inc_handler called')
-        
-    def start_handler(self):
+    def start_scan(self):
+        for shot in range(self.turntable.photos_per_scan):
+            for cam_num, cam in enumerate(self.cameras):
+                cam.take_photo()
+                self.cam_counters[cam_num].display(cam.number_of_photos_taken)
+                
+
+            app.processEvents()
+            self.turntable.rotate_slice()
+
+    def initialization_shot(self):
+        print('Initializing...')
         for cam_num, cam in enumerate(self.cameras):
+            print('Initializing Camera {}'.format(cam_num + 1))
             cam.take_photo()
             self.cam_counters[cam_num].display(cam.number_of_photos_taken)
-        
+
     def toggle_pin(self, pin):
         if wpi.digitalRead(pin) == 1:
             wpi.digitalWrite(pin, 0)
         else:
             wpi.digitalWrite(pin, 1)
-
         
 # I feel better having one of these
 def main():
     # a new app instance
+    global app
     QApplication.setStyle('Fusion')
     app = QApplication(sys.argv)
     form = MainWindow()

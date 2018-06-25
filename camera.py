@@ -17,6 +17,7 @@ class CameraTrigger():
             CameraTrigger.is_gpio_init = True
 
         wpi.pinMode(self.gpio_pin, wpi.OUTPUT)
+        self.turn_off_gpio()
         
     def trigger_on(self, duration):
         direction = wpi.LOW
@@ -36,6 +37,13 @@ class CameraTrigger():
         print('Setting Pin {} {}'.format(self.gpio_pin, direction))
         wpi.digitalWrite(self.gpio_pin, direction)
         
+    def turn_off_gpio(self):
+        direction = wpi.HIGH
+        if not self.trigger_on_low:
+            direction = wpi.LOW
+            
+        self.set_gpio(direction)
+
     def toggle_direction(direction):
         if direction == wpi.HIGH:
             return wpi.LOW
@@ -48,13 +56,13 @@ class Camera():
         self.number_of_photos_taken = 0
 
         # rPi pin connected to camera to trigger
-        self.trigger = CameraTrigger(trigger_pin, False)
+        self.trigger = CameraTrigger(trigger_pin, True)
         
         # @TODO use Canon API to get settings right from camera, like fstop and ISO, etc.
 
     def take_photo(self):
-        self.trigger.trigger_on(2.0)
         self.number_of_photos_taken += 1
+        self.trigger.trigger_on(0.5)
         
     
     
