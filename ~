@@ -9,14 +9,11 @@ import wiringpi as wpi
 import os
 import configparser
 from camera import Camera
-from turntable import Turntable
-import time
+from import turntable.Turntable
 
 # This is our window from QtCreator
 import mainwindow_auto
-import initdialog
 
-app = None
 
 # create class for our Raspberry Pi GUI
 class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
@@ -29,9 +26,7 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
         config.read('/home/pi/.quickcapture.conf')
         print(config.sections())
         
-        turntable_data = config['TURNTABLE']
-        self.turntable = Turntable(int(turntable_data['TimeToRotate']), int(turntable_data['PhotosPerScan']))
-
+        self.photos_per_scan = int(config['TURNTABLE']['PhotosPerScan'])
         self.cameras = [];
         for x in range(0, 4):
             self.cameras.append(Camera(config['DEFAULTS']['Camera{}Pin'.format(x + 1)]))
@@ -55,21 +50,13 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
 
         self.initialize_button.clicked.connect(self.initialization_shot)
         self.start_button.clicked.connect(self.start_scan)
-        self.pushButton.clicked.connect(self.display_init)
-        
-    def display_init(self):
-        init = initdialog.InitDialog()
-        init.exec_()
         
     def start_scan(self):
-        for shot in range(self.turntable.photos_per_scan):
+        for shot in range(self.photos_per_scan):
             for cam_num, cam in enumerate(self.cameras):
                 cam.take_photo()
                 self.cam_counters[cam_num].display(cam.number_of_photos_taken)
-                
-
-            app.processEvents()
-            self.turntable.rotate_slice()
+                # @TODO control the turntable
 
     def initialization_shot(self):
         print('Initializing...')
@@ -87,7 +74,6 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
 # I feel better having one of these
 def main():
     # a new app instance
-    global app
     QApplication.setStyle('Fusion')
     app = QApplication(sys.argv)
     form = MainWindow()

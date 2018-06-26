@@ -11,7 +11,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(485, 422)
+        MainWindow.resize(503, 447)
         self.centralWidget = QtWidgets.QWidget(MainWindow)
         self.centralWidget.setObjectName("centralWidget")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.centralWidget)
@@ -168,8 +168,9 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.pushButton.setText(_translate("MainWindow", "PushButton"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Wayfair Next - QuickCapture"))
+        self.lineEdit.setPlaceholderText(_translate("MainWindow", "Name of Scan"))
+        self.pushButton.setText(_translate("MainWindow", "Set Name"))
         self.thumbnail_1.setText(_translate("MainWindow", "Camera 1 Preview"))
         self.thumbnail_3.setText(_translate("MainWindow", "Camera 3 Preview"))
         self.thumbnail_2.setText(_translate("MainWindow", "Camera 2 Preview"))
