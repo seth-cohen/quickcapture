@@ -1,2 +1,5 @@
 __pycache__
-~
+~*
+*.swp
+*.jpg
+*_tests.py

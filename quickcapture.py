@@ -25,16 +25,24 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
         super().__init__()
         self.setupUi(self) # gets defined in the UI file
 
-        config = configparser.ConfigParser()
-        config.read('/home/pi/.quickcapture.conf')
-        print(config.sections())
-        
-        turntable_data = config['TURNTABLE']
-        self.turntable = Turntable(int(turntable_data['TimeToRotate']), int(turntable_data['PhotosPerScan']))
+        self.config = configparser.ConfigParser()
+        self.config.read('/home/pi/.quickcapture.conf')
+        # if we don't already have a config file we should generate one
+        if len(self.config.sections()) == 0:
+            print('No Config file present')
+            self.generate_default_config()
+            self.display_init()
+
+        self.ui()
 
         self.cameras = [];
         for x in range(0, 4):
-            self.cameras.append(Camera(config['DEFAULTS']['Camera{}Pin'.format(x + 1)]))
+            self.cameras.append(Camera(self.config['DEFAULTS']['Camera{}Pin'.format(x + 1)], self.config['CAMERAS'].get('camera{}serial'.format(x + 1), None)))
+
+    def ui(self):
+        turntable_data = self.config['TURNTABLE']
+        self.turntable = Turntable(int(turntable_data.get('TimeToRotate', 31)), int(turntable_data.get('PhotosPerScan', 18)))
+
 
         self.cam_counters = []
         self.cam_counters.append(self.image_count_1)
@@ -56,10 +64,32 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
         self.initialize_button.clicked.connect(self.initialization_shot)
         self.start_button.clicked.connect(self.start_scan)
         self.pushButton.clicked.connect(self.display_init)
+        self.actionClose.triggered.connect(self.close)
+        self.actionConfig.triggered.connect(self.display_init)
+
+    def generate_default_config(self):
+       self.config['DEFAULTS'] = {
+           'Camera1Pin': 6,
+           'Camera2Pin': 10,
+           'Camera3Pin': 11,
+           'Camera4Pin': 31
+       }
+       self.config['TURNTABLE'] = {
+           'TimeToRotate': 31,
+           'PhotosPerScan': 18
+       }
+       self.config['FTP'] = {
+           'Host': 'FTPPartner.wayfair.com'
+       }
         
     def display_init(self):
-        init = initdialog.InitDialog()
-        init.exec_()
+        init = initdialog.InitDialog(self.config)
+        if init.exec_():
+            self.config = init.config
+            self.update_config()
+
+    def close(self):
+        exit()
         
     def start_scan(self):
         for shot in range(self.turntable.photos_per_scan):
@@ -77,6 +107,18 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
             print('Initializing Camera {}'.format(cam_num + 1))
             cam.take_photo()
             self.cam_counters[cam_num].display(cam.number_of_photos_taken)
+            preview = cam.get_preview()
+            if preview is not None:
+                preview_pixmap = Gui.QPixmap()
+                preview_pixmap.loadFromData(preview)
+
+                thumbnail = self.cam_previews[cam_num]
+                thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Core.Qt.KeepAspectRatio))
+
+    def update_config(self):
+        print('Updating Config File')
+        with open('/home/pi/.quickcapture.conf', 'w+') as config_file:
+            self.config.write(config_file)
 
     def toggle_pin(self, pin):
         if wpi.digitalRead(pin) == 1:

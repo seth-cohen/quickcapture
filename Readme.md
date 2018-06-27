@@ -14,6 +14,24 @@
 ## Then need to copy the global libraries to the virtual env
 - cp -r /usr/lib/python3/dist-packages/PyQt5 Venvs/qc/lib/python3.5/site-packages/PyQt5
 - cp /usr/lib/python3/dist-packages/sip.cpython-*.so ~/Venvs/qc/lib/python3.5/site-packages
+## To interface with the camera
+- Install gphoto2
+  ```
+  $ sudo apt-get install gphoto2
+  ```
+  That will give you command line interface.
+- Then we want it for python too. Get the dev package so we can build it ourselves
+  ```
+  sudo apt-get install libgphoto2-dev
+  ```
+- install the python wrapper - This takes a while (do it in the venv)
+  ```
+  pip install -v gphoto2
+  ```
+- if we want to access images we need pillow installed
+  ```
+  pip install pillow
+  ```
 ## Test install
 - Running the program
   - First enable the virtual environment.
@@ -34,3 +52,9 @@
 
 ## Wireless access point for networking
 - https://www.raspberrypi.org/documentation/configuration/wireless/access-point.md
+
+## Bluetooth file transfer
+- use obexpushd, need to update /etc/systemd/system/dbus-org.bluez.service
+
+## Get rid of annoying a11y warning
+- sudo apt-get install at-spi2-core

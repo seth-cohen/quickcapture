@@ -1,6 +1,10 @@
 import wiringpi as wpi
 import threading
 import time
+import io
+import sys
+import gphoto2 as gp
+from camerafactory import CameraFactory
 
 
 class CameraTrigger():
@@ -51,18 +55,28 @@ class CameraTrigger():
             return wpi.HIGH
         
 class Camera():
-    def __init__(self, trigger_pin):
+    def __init__(self, trigger_pin, serial_num):
         # number of photos that this camera has taken since program start
         self.number_of_photos_taken = 0
 
         # rPi pin connected to camera to trigger
         self.trigger = CameraTrigger(trigger_pin, True)
-        
-        # @TODO use Canon API to get settings right from camera, like fstop and ISO, etc.
 
+        if not serial_num is None:
+            self.camera = CameraFactory.get_instance().get_camera(serial_num)
+        else:
+            self.camera = None
+            
     def take_photo(self):
         self.number_of_photos_taken += 1
         self.trigger.trigger_on(0.5)
+
+    def get_preview(self):
+        if self.camera is None:
+            print('No Camera attached')
+            return None
         
-    
-    
+        print('Capturing preview image')
+        camera_file = gp.check_result(gp.gp_camera_capture_preview(self.camera))
+        file_data = gp.check_result(gp.gp_file_get_data_and_size(camera_file))
+        return file_data
