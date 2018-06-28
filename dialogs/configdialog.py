@@ -1,14 +1,15 @@
 import sys
 import PyQt5
 import PyQt5.QtWidgets as Qtw
-import configdialog_auto
 import gphoto2 as gp
 import configparser as conf
 import collections
 import camerafactory as cf
+import dialogs.configdialog_auto as configdialog_auto
+import consts
 
 
-class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_Dialog):
+class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
     def __init__(self, config):
         super().__init__()
         self.setupUi(self)
@@ -36,11 +37,11 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_Dialog):
             self.reset_camera_serial_options()
 
         turntable_settings = config['TURNTABLE']
-        self.turntable_period.setText(turntable_settings.get('timetorotate', str(31)))
-        self.photos_per_scan.setText(turntable_settings.get('photosperscan', str(18)))
+        self.turntable_period.setText(turntable_settings.get('timetorotate', consts.DEFAULT_TURNTABLE_PERIOD))
+        self.photos_per_scan.setText(turntable_settings.get('photosperscan', consts.DEFAULT_PHOTOS_PER_SCAN))
 
         ftp_settings = config['FTP']
-        self.host.setText(ftp_settings.get('host', 'FTPPartner.wayfair.com'))
+        self.host.setText(ftp_settings.get('host', consts.DEFAULT_FTP_HOST))
         self.username.setText(ftp_settings.get('username', ''))
         self.password.setText(ftp_settings.get('hash', ''))
         if len(ftp_settings.get('hash', '')) > 0 and len(ftp_settings.get('username', '')) > 0:

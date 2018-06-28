@@ -1,10 +1,8 @@
-import wiringpi as wpi
-import threading
-import time
 import io
 import sys
 import gphoto2 as gp
 import camerafactory as cf
+import gpiocontroller as gpio
 
 
 class CameraTrigger():
@@ -14,46 +12,25 @@ class CameraTrigger():
     def __init__(self, gpio_pin, trigger_on_low=True):
         self.gpio_pin = int(gpio_pin)
         self.trigger_on_low = trigger_on_low
+        self.gpio = gpio.GpioController.get_instance()
 
-        # set the pin to output so we can pull high/low and trigger
-        if not CameraTrigger.is_gpio_init:
-            wpi.wiringPiSetup()
-            CameraTrigger.is_gpio_init = True
-
-        wpi.pinMode(self.gpio_pin, wpi.OUTPUT)
+        self.gpio.set_pin_mode(self.gpio_pin, gpio.OUTPUT)
         self.turn_off_gpio()
         
     def trigger_on(self, duration):
-        direction = wpi.LOW
+        direction = gpio.LOW
         if not self.trigger_on_low:
-            direction = wpi.HIGH
+            direction = gpio.HIGH
             
-        self.set_gpio_with_duration(direction, duration)
-
-    def set_gpio_with_duration(self, direction, duration):
-        self.set_gpio(direction)
-
-        next_direction = CameraTrigger.toggle_direction(direction)
-        print('Triggering Thread for Pin {} setting to {} in {} sec'.format(self.gpio_pin, next_direction, duration) )
-        threading.Timer(duration, self.set_gpio, args=(next_direction,)).start()
-
-    def set_gpio(self, direction):
-        print('Setting Pin {} {}'.format(self.gpio_pin, direction))
-        wpi.digitalWrite(self.gpio_pin, direction)
+        self.gpio.set_with_duration(self.gpio_pin, direction, duration)
         
     def turn_off_gpio(self):
-        direction = wpi.HIGH
+        direction = gpio.HIGH
         if not self.trigger_on_low:
-            direction = wpi.LOW
+            direction = gpio.LOW
             
-        self.set_gpio(direction)
+        self.gpio.set_gpio(self.gpio_pin, direction)
 
-    def toggle_direction(direction):
-        if direction == wpi.HIGH:
-            return wpi.LOW
-        else:
-            return wpi.HIGH
-        
 class Camera():
     def __init__(self, trigger_pin, serial_num):
         # number of photos that this camera has taken since program start
@@ -62,6 +39,7 @@ class Camera():
         # rPi pin connected to camera to trigger
         self.trigger = CameraTrigger(trigger_pin, True)
 
+        print('Cam on pin {} has serial number {}'.format(trigger_pin, serial_num))
         if not serial_num is None:
             self.camera = cf.CameraFactory.get_instance().get_camera(serial_num)
         else:

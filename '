@@ -1,6 +1,6 @@
 import time
 import consts
-import gpiocontroller as gpio
+import wiringpi as wpi
 
 class Turntable():
     def __init__(
@@ -15,15 +15,9 @@ class Turntable():
         self.enable_rotation_duration = self.period / photos_per_scan
         self.delay = delay
         self.gpio_pin = gpio_pin
-        self.gpio = gpio.GpioController.get_instance()
-        self.gpio.set_pin_mode(self.gpio_pin, gpio.OUTPUT)
-        
+
     def rotate_slice(self):
         print('Rotating table for {} seconds'.format(self.enable_rotation_duration))
-        self.gpio.set_gpio(self.gpio_pin, gpio.LOW)
-
         time.sleep(self.enable_rotation_duration)
-        self.gpio.set_gpio(self.gpio_pin, gpio.HIGH)
-        
         print('Delay for {} seconds'.format(self.delay))
         time.sleep(self.delay)
