@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'initdialog.ui'
+# Form implementation generated from reading ui file 'configdialog.ui'
 #
 # Created by: PyQt5 UI code generator 5.10.1
 #
@@ -133,12 +133,14 @@ class Ui_Dialog(object):
         self.host_labal.setObjectName("host_labal")
         self.formLayout_3.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.host_labal)
         self.host = QtWidgets.QLineEdit(Dialog)
+        self.host.setEnabled(False)
         self.host.setObjectName("host")
         self.formLayout_3.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.host)
         self.username_label = QtWidgets.QLabel(Dialog)
         self.username_label.setObjectName("username_label")
         self.formLayout_3.setWidget(1, QtWidgets.QFormLayout.LabelRole, self.username_label)
         self.username = QtWidgets.QLineEdit(Dialog)
+        self.username.setEnabled(True)
         self.username.setMaximumSize(QtCore.QSize(200, 16777215))
         self.username.setObjectName("username")
         self.formLayout_3.setWidget(1, QtWidgets.QFormLayout.FieldRole, self.username)
@@ -146,17 +148,30 @@ class Ui_Dialog(object):
         self.password_label.setObjectName("password_label")
         self.formLayout_3.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.password_label)
         self.password = QtWidgets.QLineEdit(Dialog)
+        self.password.setEnabled(True)
         self.password.setMaximumSize(QtCore.QSize(200, 16777215))
+        self.password.setInputMask("")
+        self.password.setText("")
+        self.password.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.password.setClearButtonEnabled(False)
         self.password.setObjectName("password")
         self.formLayout_3.setWidget(2, QtWidgets.QFormLayout.FieldRole, self.password)
         self.verticalLayout_2.addLayout(self.formLayout_3)
+        self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_4.setObjectName("horizontalLayout_4")
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_4.addItem(spacerItem3)
+        self.unlock_ftp_button = QtWidgets.QPushButton(Dialog)
+        self.unlock_ftp_button.setObjectName("unlock_ftp_button")
+        self.horizontalLayout_4.addWidget(self.unlock_ftp_button)
+        self.verticalLayout_2.addLayout(self.horizontalLayout_4)
         self.line = QtWidgets.QFrame(Dialog)
         self.line.setFrameShape(QtWidgets.QFrame.HLine)
         self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.line.setObjectName("line")
         self.verticalLayout_2.addWidget(self.line)
-        spacerItem3 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_2.addItem(spacerItem3)
+        spacerItem4 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout_2.addItem(spacerItem4)
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
@@ -188,4 +203,5 @@ class Ui_Dialog(object):
         self.host.setText(_translate("Dialog", "FTPPartner.wayfair.com"))
         self.username_label.setText(_translate("Dialog", "Username: "))
         self.password_label.setText(_translate("Dialog", "Password: "))
+        self.unlock_ftp_button.setText(_translate("Dialog", "Unlock FTP Settings"))
 

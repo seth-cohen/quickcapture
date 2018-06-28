@@ -1,4 +1,5 @@
 import gphoto2 as gp
+import PyQt5.QtWidgets as Qtw
 
 
 class CameraFactory():
@@ -25,8 +26,8 @@ class CameraFactory():
 
             if len(camera_list) == 0:
                 print('No Cameras Detected')
-                QMessageBox.about(
-                    self,
+                Qtw.QMessageBox.about(
+                    None,
                     'Error Detecting Cameras',
                     'No cameras were detected. Confirm that 4 cameras are attached'
                 )

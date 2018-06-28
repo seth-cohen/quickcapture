@@ -1,25 +1,32 @@
 # This gets the Qt stuff
 import sys
 import PyQt5
-from PyQt5.QtWidgets import *
-import PyQt5.QtGui as Gui
-import PyQt5.QtCore as Core
+import PyQt5.QtWidgets as Qtw
+import PyQt5.QtGui as Qtg
+import PyQt5.QtCore as Qtc
 import wiringpi as wpi
 
 import os
 import configparser
-from camera import Camera
-from turntable import Turntable
+import camera
+import turntable
 import time
 
 # This is our window from QtCreator
-import mainwindow_auto
-import initdialog
+import mainwindow_auto as main
+import configdialog
 
 app = None
+EFAULT_DELAY = 5.0
+DEFAULT_TURNTABLE_PERIOD = 31
+DEFAULT_PHOTOS_PER_SCAN = 18
+DEFAULT_CAM_1_PIN = 6
+DEFAULT_CAM_2_PIN = 10
+DEFAULT_CAM_3_PIN = 11
+DEFAULT_CAM_4_PIN = 31
 
 # create class for our Raspberry Pi GUI
-class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
+class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
     # access variables inside of the UI's file
     def __init__(self):
         super().__init__()
@@ -31,17 +38,21 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
         if len(self.config.sections()) == 0:
             print('No Config file present')
             self.generate_default_config()
-            self.display_init()
+            self.display_config()
 
         self.ui()
 
         self.cameras = [];
         for x in range(0, 4):
-            self.cameras.append(Camera(self.config['DEFAULTS']['Camera{}Pin'.format(x + 1)], self.config['CAMERAS'].get('camera{}serial'.format(x + 1), None)))
+            self.cameras.append(camera.Camera(self.config['DEFAULTS']['camera{}pin'.format(x + 1)], self.config['CAMERAS'].get('camera{}serial'.format(x + 1), None)))
 
     def ui(self):
         turntable_data = self.config['TURNTABLE']
-        self.turntable = Turntable(int(turntable_data.get('TimeToRotate', 31)), int(turntable_data.get('PhotosPerScan', 18)))
+        self.turntable = turntable.Turntable(
+            int(turntable_data.get('timetorotate', 31)),
+            int(turntable_data.get('photosperscan', 18)),
+            float(turntable_data.get('delay', 5.0))
+        )
 
 
         self.cam_counters = []
@@ -59,35 +70,44 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
         preview_image_path = os.path.join(path, 'cam_preview.png')
         print(preview_image_path)
         for preview in self.cam_previews:
-            preview.setPixmap(Gui.QPixmap(preview_image_path).scaled(preview.width(), preview.height(), Core.Qt.KeepAspectRatio))
+            preview.setPixmap(Qtg.QPixmap(preview_image_path).scaled(preview.width(), preview.height(), Qtc.Qt.KeepAspectRatio))
 
         self.initialize_button.clicked.connect(self.initialization_shot)
-        self.start_button.clicked.connect(self.start_scan)
-        self.pushButton.clicked.connect(self.display_init)
+        self.new_scan_button.clicked.connect(self.start_scan)
+        self.pushButton.clicked.connect(self.display_config)
+        self.ftp_button.clicked.connect(self.display_ftp)
         self.actionClose.triggered.connect(self.close)
-        self.actionConfig.triggered.connect(self.display_init)
+        self.actionConfig.triggered.connect(self.display_config)
 
     def generate_default_config(self):
        self.config['DEFAULTS'] = {
-           'Camera1Pin': 6,
-           'Camera2Pin': 10,
-           'Camera3Pin': 11,
-           'Camera4Pin': 31
+           'camera1pin': 6,
+           'camera2pin': 10,
+           'camera3pin': 11,
+           'camera4pin': 31
        }
        self.config['TURNTABLE'] = {
-           'TimeToRotate': 31,
-           'PhotosPerScan': 18
+           'timetorotate': 31,
+           'photosperscan': 18,
+           'delay': 5.0
        }
        self.config['FTP'] = {
            'Host': 'FTPPartner.wayfair.com'
        }
         
-    def display_init(self):
-        init = initdialog.InitDialog(self.config)
+    def display_config(self):
+        init = configdialog.ConfigDialog(self.config)
+        # We want a modal dialog. exec_() will open the dialog Modally.
         if init.exec_():
             self.config = init.config
             self.update_config()
 
+    def display_ftp(self):
+        ftp = ftpdialog.FTPDialog(self.config)
+        if ftp.exec():
+            # reset camera counts etc.            
+            pass
+        
     def close(self):
         exit()
         
@@ -104,16 +124,16 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
     def initialization_shot(self):
         print('Initializing...')
         for cam_num, cam in enumerate(self.cameras):
-            print('Initializing Camera {}'.format(cam_num + 1))
+            print('Initializing camera.Camera {}'.format(cam_num + 1))
             cam.take_photo()
             self.cam_counters[cam_num].display(cam.number_of_photos_taken)
             preview = cam.get_preview()
             if preview is not None:
-                preview_pixmap = Gui.QPixmap()
+                preview_pixmap = Qtg.QPixmap()
                 preview_pixmap.loadFromData(preview)
 
                 thumbnail = self.cam_previews[cam_num]
-                thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Core.Qt.KeepAspectRatio))
+                thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
 
     def update_config(self):
         print('Updating Config File')
@@ -130,8 +150,8 @@ class MainWindow(QMainWindow, mainwindow_auto.Ui_MainWindow):
 def main():
     # a new app instance
     global app
-    QApplication.setStyle('Fusion')
-    app = QApplication(sys.argv)
+    Qtw.QApplication.setStyle('Fusion')
+    app = Qtw.QApplication(sys.argv)
     form = MainWindow()
     form.show()
     

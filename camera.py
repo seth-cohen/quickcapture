@@ -4,7 +4,7 @@ import time
 import io
 import sys
 import gphoto2 as gp
-from camerafactory import CameraFactory
+import camerafactory as cf
 
 
 class CameraTrigger():
@@ -63,7 +63,7 @@ class Camera():
         self.trigger = CameraTrigger(trigger_pin, True)
 
         if not serial_num is None:
-            self.camera = CameraFactory.get_instance().get_camera(serial_num)
+            self.camera = cf.CameraFactory.get_instance().get_camera(serial_num)
         else:
             self.camera = None
             

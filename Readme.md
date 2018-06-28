@@ -14,7 +14,9 @@
 ## Then need to copy the global libraries to the virtual env
 - cp -r /usr/lib/python3/dist-packages/PyQt5 Venvs/qc/lib/python3.5/site-packages/PyQt5
 - cp /usr/lib/python3/dist-packages/sip.cpython-*.so ~/Venvs/qc/lib/python3.5/site-packages
-## To interface with the camera
+## To interface with the camera over USB. This is not for the faint of heart... the documentation
+is not great for this with python but I found the source code [here][python-gphoto2] and there is
+a way to play with it and see what calls you need to make
 - Install gphoto2
   ```
   $ sudo apt-get install gphoto2
@@ -32,6 +34,16 @@
   ```
   pip install pillow
   ```
+- There is an annoyance with the gvfs Gnome file system that will auto mount the camera when connected.
+This is a prblem because then gphoto2, in some firmware versions, will not be able to claim the device
+  - To prevent this you must update the file system explorer
+  Add the following to `~/.config/pcmanfm/LXDE-pi/pcmanfm.conf`
+  ```
+  [volume]
+  mount_on_startup=0
+  mount_removable=0
+  ```
+  
 ## Test install
 - Running the program
   - First enable the virtual environment.
@@ -58,3 +70,5 @@
 
 ## Get rid of annoying a11y warning
 - sudo apt-get install at-spi2-core
+
+[python-gphoto2]: https://github.com/jim-easterbrook/python-gphoto2/tree/master/src/gphoto2
