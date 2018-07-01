@@ -4,6 +4,10 @@ import PyQt5.QtWidgets as Qtw
 import gphoto2 as gp
 import configparser as conf
 import collections
+import Crypto.Cipher.AES as AES
+import Crypto.Random as rand
+import base64
+
 import camerafactory as cf
 import dialogs.configdialog_auto as configdialog_auto
 import consts
@@ -32,7 +36,7 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
             camera_settings = self.config['CAMERAS']
             for cam_num, camera_combo in enumerate(self.camera_combos):
                 camera_combo.addItem(camera_settings.get('Camera{}Serial'.format(cam_num + 1), '- No Camera Set -'))
-                camera_combo.setEnabled(False)
+                camera_combo.setEditable(False)
         else:
             self.reset_camera_serial_options()
 
@@ -43,10 +47,21 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
         ftp_settings = config['FTP']
         self.host.setText(ftp_settings.get('host', consts.DEFAULT_FTP_HOST))
         self.username.setText(ftp_settings.get('username', ''))
-        self.password.setText(ftp_settings.get('hash', ''))
-        if len(ftp_settings.get('hash', '')) > 0 and len(ftp_settings.get('username', '')) > 0:
-            self.password.setEnabled(False)
-            self.username.setEnabled(False)
+
+        # decrypt the hashed password
+        hash = base64.b64decode(ftp_settings.get('h', ''))
+        tag = base64.b64decode(ftp_settings.get('t', ''))
+        nonce = base64.b64decode(ftp_settings.get('n', ''))
+        key = base64.b64decode(ftp_settings.get('k', ''))
+        pw = ''
+        if len(hash) > 0 and len(tag) > 0 and len(nonce) > 0 and len(key) > 0:
+            cipher = AES.new(key, AES.MODE_EAX, nonce)
+            pw = cipher.decrypt_and_verify(hash, tag).decode('utf-8')
+            self.password.setText(pw)
+            
+        if  len(pw) > 0 and len(ftp_settings.get('username', '')) > 0:
+            self.password.setReadOnly(True)
+            self.username.setReadOnly(True)
         
         # Attach handlers for buttons
         self.camera_reset_button.clicked.connect(self.reset_camera_serial_options)
@@ -59,12 +74,12 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
             while camera_combo.count() > 0:
                 camera_combo.removeItem(0)
                                      
-            camera_combo.setEnabled(True)
+            camera_combo.setEditable(True)
             camera_combo.addItems(serial_options)
 
     def unlock_ftp_settings(self):
-        self.password.setEnabled(True)
-        self.username.setEnabled(True)
+        self.password.setReadOnly(False)
+        self.username.setReadOnly(False)
    
     def accept(self):
         cams = {}
@@ -80,6 +95,15 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
         
         self.config['FTP']['username'] = self.username.text()
         if len(self.password.text()) > 0:
-            self.config['FTP']['hash'] = self.password.text()
+            # just going to store all these in the conf file, not really concerned with too
+            # much security just something that obfuscates a bit
+            key = rand.get_random_bytes(16)
+            cipher = AES.new(key, AES.MODE_EAX)
+            ciphertext, tag = cipher.encrypt_and_digest(self.password.text().encode('utf-8'))
+
+            self.config['FTP']['h'] = base64.b64encode(ciphertext).decode('utf-8')
+            self.config['FTP']['t'] = base64.b64encode(tag).decode('utf-8')
+            self.config['FTP']['n'] = base64.b64encode(cipher.nonce).decode('utf-8')
+            self.config['FTP']['k'] = base64.b64encode(key).decode('utf-8')
 
         super().accept()

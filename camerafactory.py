@@ -15,24 +15,16 @@ class CameraFactory():
         if CameraFactory.__instance != None:
             raise Exception('Do not call CameraFactory() directly. Use static get_instance')
         else:
-            self.cameras = {}
+            self.cameras = None
             CameraFactory.__instance = self
 
     def get_cameras(self):
-        if len(self.cameras) == 0:
-            camera_list = []
-            for name, addr in gp.check_result(gp.gp_camera_autodetect()):
-                camera_list.append((name, addr))
+        if self.cameras is None:
+            self.cameras = {}
+            has_attached_cameras = False
 
-            if len(camera_list) == 0:
-                print('No Cameras Detected')
-                Qtw.QMessageBox.about(
-                    None,
-                    'Error Detecting Cameras',
-                    'No cameras were detected. Confirm that 4 cameras are attached'
-                )
-
-            for index, (name, addr) in enumerate(camera_list):
+            for index, (name, addr) in enumerate(gp.check_result(gp.gp_camera_autodetect())):
+                has_attached_cameras = True
                 print('{:d}: {:s} {:s}'.format(index, addr, name))
                 context = gp.Context()
                 camera = gp.Camera()
@@ -47,6 +39,13 @@ class CameraFactory():
                 serial = camera_config.get_child_by_name('eosserialnumber') 
                 self.cameras[serial.get_value()] = (camera, {'port_index': idx})
 
+            if has_attached_cameras == False:
+                print('No Cameras Detected')
+                Qtw.QMessageBox.about(
+                    None,
+                    'Error Detecting Cameras',
+                    'No cameras were detected. Confirm that 4 cameras are attached'
+                )
         return self.cameras
 
     def get_camera_serials(self):

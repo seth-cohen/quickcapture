@@ -47,6 +47,9 @@ class Ui_NewScanDialog(object):
 
         self.retranslateUi(NewScanDialog)
         QtCore.QMetaObject.connectSlotsByName(NewScanDialog)
+        NewScanDialog.setTabOrder(self.scan_name_input, self.start_scan_button)
+        NewScanDialog.setTabOrder(self.start_scan_button, self.scan_type)
+        NewScanDialog.setTabOrder(self.scan_type, self.cancel_button)
 
     def retranslateUi(self, NewScanDialog):
         _translate = QtCore.QCoreApplication.translate
@@ -55,6 +58,7 @@ class Ui_NewScanDialog(object):
         self.scan_type.setItemText(0, _translate("NewScanDialog", "Scan New Subject"))
         self.scan_type.setItemText(1, _translate("NewScanDialog", "Scan Additional Part (multipart subject)"))
         self.label.setText(_translate("NewScanDialog", "Name of Scan: "))
+        self.scan_name_input.setPlaceholderText(_translate("NewScanDialog", "Enter Name "))
         self.cancel_button.setText(_translate("NewScanDialog", "Cancel"))
         self.start_scan_button.setText(_translate("NewScanDialog", "Start Scan"))
 

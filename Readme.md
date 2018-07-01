@@ -11,6 +11,8 @@
   $ source ~/Venvs/qc/bin/activate
   ```
 - pip install wiringpi
+## We are going to be dealing with user passwords so we'll want to encrypt and decrypt
+- pip install pycryptodome
 ## Then need to copy the global libraries to the virtual env
 - cp -r /usr/lib/python3/dist-packages/PyQt5 Venvs/qc/lib/python3.5/site-packages/PyQt5
 - cp /usr/lib/python3/dist-packages/sip.cpython-*.so ~/Venvs/qc/lib/python3.5/site-packages
@@ -43,7 +45,10 @@ This is a prblem because then gphoto2, in some firmware versions, will not be ab
   mount_on_startup=0
   mount_removable=0
   ```
-  
+## Styling
+- pip install qdarkstyle
+-
+
 ## Test install
 - Running the program
   - First enable the virtual environment.

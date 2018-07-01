@@ -13,7 +13,7 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
         self.setupUi(self)
         
         self.scan_name = scan_name
-        self.parts_count = 0
+        self.is_additional_part = False
         
         if scan_name == '':
             self.scan_name_input.setEnabled(True)
@@ -43,6 +43,8 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
         if i == ADDITIONAL_PART:
             self.scan_name_input.setText(self.scan_name)
             self.scan_name_input.setEnabled(False)
+            self.is_additional_part = True
         else:
             self.scan_name_input.setText('')
             self.scan_name_input.setEnabled(True)
+            self.is_additional_part = False
