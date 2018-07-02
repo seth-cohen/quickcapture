@@ -74,7 +74,6 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
             while camera_combo.count() > 0:
                 camera_combo.removeItem(0)
                                      
-            camera_combo.setEditable(True)
             camera_combo.addItems(serial_options)
 
     def unlock_ftp_settings(self):

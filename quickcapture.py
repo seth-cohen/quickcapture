@@ -6,6 +6,8 @@ import PyQt5.QtGui as Qtg
 import PyQt5.QtCore as Qtc
 import wiringpi as wpi
 import os
+import time
+import asyncio
 
 # styling
 import qdarkstyle
@@ -14,7 +16,6 @@ import configparser
 import camera
 import consts
 import turntable
-import time
 
 # This is our window from QtCreator
 import mainwindow_auto as main
@@ -50,7 +51,14 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
     def setup_hardware(self):
         self.cameras = [];
         for x in range(0, 4):
-            self.cameras.append(camera.Camera(self.config['DEFAULTS']['camera{}pin'.format(x + 1)], self.config['CAMERAS'].get('camera{}serial'.format(x + 1), None), x))
+            self.cameras.append(
+                camera.Camera(
+                    self.config['DEFAULTS']['camera{}pin'.format(x + 1)],
+                    self.config['CAMERAS'].get('camera{}serial'.format(x + 1), None),
+                    x,
+                    self.image_saved_callback
+                )
+            )
 
         turntable_data = self.config['TURNTABLE']
         self.turntable = turntable.Turntable(
@@ -73,7 +81,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         self.cam_previews.append(self.thumbnail_3)
         self.cam_previews.append(self.thumbnail_4)
         
-        self.initialize_button.clicked.connect(self.initialization_shot)
+        self.initialize_button.clicked.connect(self.perform_initialization_shot_async)
         self.new_scan_button.clicked.connect(self.start_scan)
         self.ftp_button.clicked.connect(self.display_ftp)
         self.actionClose.triggered.connect(self.close)
@@ -85,7 +93,6 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         """
         path = os.path.dirname(os.path.abspath(__file__))
         preview_image_path = os.path.join(path, 'cam_no_preview.png')
-        print(preview_image_path)
         for preview in self.cam_previews:
             preview.setPixmap(Qtg.QPixmap(preview_image_path).scaled(preview.width(), preview.height(), Qtc.Qt.KeepAspectRatio))
 
@@ -146,8 +153,10 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             else:
                 self.scan_name_label.setText(scan_name)
                 self.scans[scan_name] = [1]
-                
-            self.perform_scan_cycle()
+
+            a = asyncio.get_event_loop()
+            a.run_until_complete(self.perform_scan_cycle())
+            a.close()
 
             orientation_image = Qtg.QPixmap()
             orientation_image.load('orientation.png')
@@ -160,19 +169,34 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 orientation_image,
                 True
             ):
-                self.perform_scan_cycle()
+                a.run_until_complete(self.perform_scan_cycle())
                 self.scans[scan_name][self.scan_part_count - 1] += 1
 
             self.last_scan_name = scan_name
-            print(self.scans)
-                
-    def perform_scan_cycle(self):
-        cam_list = range(len(self.cameras))
-        for shot in range(self.turntable.photos_per_scan):
-            self.take_photo_for_cams(cam_list)
 
+            print(self.scans)
+
+    def waiting_on_previews(self):
+        for cam in self.cameras:
+            if cam.thread is not None:
+                return True
+
+        return False
+            
+    async def perform_scan_cycle(self):
+        cam_list = range(len(self.cameras))
+        print('~===-*^% Photos per scan {}'.format(self.turntable.photos_per_scan))
+        for shot in range(self.turntable.photos_per_scan):
+            print('----====**** LOOPING ****====----')
+            # if shot > 0:
+            #     self.turntable.rotate_slice()
+            #     while self.turntable.is_rotating:
+            #         await asyncio.sleep(0.2)
+            await self.take_photo_for_cams(cam_list)
+            while self.waiting_on_previews():
+                await asyncio.sleep(0.2)
+                
             consts.app.processEvents()
-            self.turntable.rotate_slice()
 
         background_image = Qtg.QPixmap()
         background_image.load('background.png')
@@ -183,7 +207,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             'Remove object and then click the `Take Photo` button to shoot the empty stage and background',
             background_image
         )
-        self.take_photo_for_cams(cam_list)
+        await self.take_photo_for_cams(cam_list)
 
         checker_image = Qtg.QPixmap()
         checker_image.load('colorcard.png')
@@ -194,7 +218,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             'Ensure color checker is visible in each camera of the cameras and the click `Take Photo` button',
             checker_image
         )
-        self.take_photo_for_cams(cam_list)
+        await self.take_photo_for_cams(cam_list)
 
     def show_message_box(self, button_text, title, text, informative_text=None, image=None, is_choice=False):
         msgbox = msgdialog.MessageDialog(
@@ -207,23 +231,37 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         )
         return msgbox.exec_()
         
-    def take_photo_for_cams(self, which_cams):
+    async def take_photo_for_cams(self, which_cams):
         for cam_num in which_cams:
             cam = self.cameras[cam_num]
-            cam.take_photo()
-            self.textEdit.append(cam.get_new_photo()) 
-            self.cam_counters[cam_num].display(cam.number_of_photos_taken)
-            preview = cam.get_preview()
-            if preview is not None:
-                preview_pixmap = Qtg.QPixmap()
-                preview_pixmap.loadFromData(preview)
-
-                thumbnail = self.cam_previews[cam_num]
-                thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
+            full_scan_name = self.last_scan_name
+            if self.scan_part_count > 1:
+                full_scan_name += str(self.scan_part_count)
                 
-    def initialization_shot(self):
-        print('Taking initialization shots')
-        self.take_photo_for_cams(range(len(self.cameras)))
+            await cam.take_photo(full_scan_name)
+
+    def image_saved_callback(self, cam_num, file_name, folder):
+        cam = self.cameras[cam_num]
+        self.cam_counters[cam_num].display(cam.number_of_photos_taken)
+        self.textEdit.append('Cam {}: {}'.format(cam_num + 1, file_name))
+        preview = cam.get_preview(file_name, folder)
+        if preview is not None:
+            preview_pixmap = Qtg.QPixmap()
+            preview_pixmap.loadFromData(preview)
+
+            thumbnail = self.cam_previews[cam_num]
+            thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
+
+        consts.app.processEvents()
+
+    def perform_initialization_shot_async(self):
+        a = asyncio.get_event_loop()
+        a.run_until_complete(self.initialization_shot())
+        a.close()
+
+    async def initialization_shot(self):
+        print('============ Taking initialization shots ===============')
+        await self.take_photo_for_cams(range(len(self.cameras)))
 
     def update_config(self):
         """This method is called any time our configuration has changed
@@ -236,7 +274,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         with open(consts.CONFIG_FILE, 'w+') as config_file:
             self.config.write(config_file)
 
-    def toggle_pin(self, pin):
+    def toggle_pin(self, pinsoreview):
         if wpi.digitalRead(pin) == 1:
             wpi.digitalWrite(pin, 0)
         else:
