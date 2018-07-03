@@ -27,14 +27,23 @@ import dialogs.messagedialog as msgdialog
 
 # create class for our Raspberry Pi GUI
 class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
-    # access variables inside of the UI's file
+    """MainWindow is the top level GUI window running in the main thread
+
+    This QT5 QMainWindow offers functionality consisting of viewing image previews, 
+    initiating scans or setup shots, and transfering data to the processing FTP servers
+
+    Attributes:
+        scans (dict of str: int): 
+
+    """
+    
     def __init__(self):
         super().__init__()
         self.setupUi(self) # gets defined in the UI file
         self.connect_ui()
 
         self.scans = {}
-        self.last_scan_name = ''
+        self.scan_name = ''
         self.scan_part_count = 1
 
         self.config = configparser.ConfigParser()
@@ -81,7 +90,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         self.cam_previews.append(self.thumbnail_3)
         self.cam_previews.append(self.thumbnail_4)
         
-        self.initialize_button.clicked.connect(self.perform_initialization_shot_async)
+        self.initialize_button.clicked.connect(self.initialization_shot)
         self.new_scan_button.clicked.connect(self.start_scan)
         self.ftp_button.clicked.connect(self.display_ftp)
         self.actionClose.triggered.connect(self.close)
@@ -139,7 +148,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         exit()
         
     def start_scan(self):
-        dialog = scandialog.NewScanDialog(len(self.scans) == 0, self.last_scan_name)
+        dialog = scandialog.NewScanDialog(len(self.scans) == 0, self.scan_name)
         if dialog.exec_():
             scan_name = dialog.scan_name
             if dialog.is_additional_part:
@@ -154,9 +163,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 self.scan_name_label.setText(scan_name)
                 self.scans[scan_name] = [1]
 
-            a = asyncio.get_event_loop()
-            a.run_until_complete(self.perform_scan_cycle())
-            a.close()
+            self.perform_scan_cycle()
 
             orientation_image = Qtg.QPixmap()
             orientation_image.load('orientation.png')
@@ -169,10 +176,10 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 orientation_image,
                 True
             ):
-                a.run_until_complete(self.perform_scan_cycle())
+                self.perform_scan_cycle()
                 self.scans[scan_name][self.scan_part_count - 1] += 1
 
-            self.last_scan_name = scan_name
+            self.scan_name = scan_name
 
             print(self.scans)
 
@@ -183,21 +190,19 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
         return False
             
-    async def perform_scan_cycle(self):
+    def perform_scan_cycle(self):
         cam_list = range(len(self.cameras))
         print('~===-*^% Photos per scan {}'.format(self.turntable.photos_per_scan))
         for shot in range(self.turntable.photos_per_scan):
-            print('----====**** LOOPING ****====----')
-            # if shot > 0:
-            #     self.turntable.rotate_slice()
-            #     while self.turntable.is_rotating:
-            #         await asyncio.sleep(0.2)
-            await self.take_photo_for_cams(cam_list)
-            while self.waiting_on_previews():
-                await asyncio.sleep(0.2)
-                
-            consts.app.processEvents()
+            print('=============== LOOPING ================')
+            if shot > 0:
+                self.turntable.rotate_slice()
+            self.take_photo_for_cams(cam_list, True)
+            for i in range(10):
+                time.sleep(0.01)
+                Qtw.QApplication.processEvents()
 
+        Qtw.QApplication.processEvents()
         background_image = Qtg.QPixmap()
         background_image.load('background.png')
         self.show_message_box(
@@ -207,8 +212,9 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             'Remove object and then click the `Take Photo` button to shoot the empty stage and background',
             background_image
         )
-        await self.take_photo_for_cams(cam_list)
+        self.take_photo_for_cams(cam_list)
 
+        Qtw.QApplication.processEvents()
         checker_image = Qtg.QPixmap()
         checker_image.load('colorcard.png')
         self.show_message_box(
@@ -218,7 +224,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             'Ensure color checker is visible in each camera of the cameras and the click `Take Photo` button',
             checker_image
         )
-        await self.take_photo_for_cams(cam_list)
+        self.take_photo_for_cams(cam_list)
 
     def show_message_box(self, button_text, title, text, informative_text=None, image=None, is_choice=False):
         msgbox = msgdialog.MessageDialog(
@@ -231,37 +237,42 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         )
         return msgbox.exec_()
         
-    async def take_photo_for_cams(self, which_cams):
-        for cam_num in which_cams:
-            cam = self.cameras[cam_num]
-            full_scan_name = self.last_scan_name
+    def take_photo_for_cams(self, which_cams, for_scan=False):
+        # Name the bucket that we want to associate these images with
+        association = 'initialization'
+        if for_scan:
+            full_scan_name = self.scan_name
             if self.scan_part_count > 1:
                 full_scan_name += str(self.scan_part_count)
-                
-            await cam.take_photo(full_scan_name)
+
+        coroutines = []
+        for cam_num in which_cams:
+            coroutines.append(self.cameras[cam_num].take_photo(association))
+            
+        loop = asyncio.get_event_loop()
+        responses = loop.run_until_complete(asyncio.gather(*coroutines))
+
+        for i, cam_num in enumerate(which_cams):
+            response = responses[i]
+            if len(response) > 0:
+                cam = self.cameras[cam_num]
+                self.cam_counters[cam_num].display(cam.number_of_photos_taken)
+                self.textEdit.append('Cam {}: {}'.format(cam_num + 1, response['file']))
+                preview = cam.get_preview(response['file'], response['dir'])
+                if preview is not None:
+                    preview_pixmap = Qtg.QPixmap()
+                    preview_pixmap.loadFromData(preview)
+
+                    thumbnail = self.cam_previews[cam_num]
+                    thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
 
     def image_saved_callback(self, cam_num, file_name, folder):
-        cam = self.cameras[cam_num]
-        self.cam_counters[cam_num].display(cam.number_of_photos_taken)
-        self.textEdit.append('Cam {}: {}'.format(cam_num + 1, file_name))
-        preview = cam.get_preview(file_name, folder)
-        if preview is not None:
-            preview_pixmap = Qtg.QPixmap()
-            preview_pixmap.loadFromData(preview)
+        print('\t----==== MainWindow - Image Saved Callback ====----')
 
-            thumbnail = self.cam_previews[cam_num]
-            thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
 
-        consts.app.processEvents()
-
-    def perform_initialization_shot_async(self):
-        a = asyncio.get_event_loop()
-        a.run_until_complete(self.initialization_shot())
-        a.close()
-
-    async def initialization_shot(self):
+    def initialization_shot(self):
         print('============ Taking initialization shots ===============')
-        await self.take_photo_for_cams(range(len(self.cameras)))
+        self.take_photo_for_cams(range(len(self.cameras)))
 
     def update_config(self):
         """This method is called any time our configuration has changed
