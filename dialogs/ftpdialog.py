@@ -39,7 +39,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             tuple where first index is number of series and second is a string of notes/description of scan 
 
     """
-    def __init__(self, config, cameras, image_associations, scan_details):
+    def __init__(self, config, cameras, image_associations, scan_details, base_dir):
         super().__init__()
         self.setupUi(self)
 
@@ -48,7 +48,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.config = config
         self.image_associations = image_associations
         self.scan_details = scan_details
-        self.base_dir = None
+        self.base_dir = base_dir
 
         path = os.path.dirname(os.path.abspath(__file__))
         logo_path = os.path.join(path, 'logo.png')
@@ -73,6 +73,19 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.copy_threads = {}
         self.zip_thread = None
         self.ftp_thread = None
+
+        if len(self.scan_details) == -1:
+            options = Qtw.QFileDialog.Options()
+            options |= Qtw.QFileDialog.ShowDirsOnly 
+            dir = Qtw.QFileDialog.getExistingDirectory(
+                self,
+                'Select Directory To Transfer or Cancel to copy camera files or go back and start new scan',
+                str(pathlib.Path.home()),
+                options
+            )
+            print(str(pathlib.Path.home()))
+            print(dir)
+
         
     def update_log(self, text):
         self.status_log.append(text)
@@ -218,7 +231,6 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
 
     def ftp_transfer(self):
         base_dir = self.get_base_dir()
-        conn = ftp.F
 
     def get_base_dir(self):
         """Get the base directory to copy files to (defaults to current date)
@@ -228,7 +240,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
 
         """
         if self.base_dir == None:
-            self.base_dir = os.path.join(str(pathlib.Path.home()), time.strftime('%Y%m%d_%H%M%S'))
+            self.base_dir = os.path.join(str(pathlib.Path.home()), time.strftime('%Y%m%d'))
 
         return self.base_dir
 
@@ -714,6 +726,7 @@ def get_ftp_connection(config):
     else:
         raise NoPasswordError()
 
+    print('Getting connection:\nHost: {}\nUser: {}\nPW: {}'.format(host, username, pw))
     return ftp.FTP(host, user=username, passwd=pw)
 
 class NoPasswordError(Exception):

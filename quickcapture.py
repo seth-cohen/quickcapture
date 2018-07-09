@@ -5,6 +5,7 @@ import PyQt5.QtWidgets as Qtw
 import PyQt5.QtGui as Qtg
 import PyQt5.QtCore as Qtc
 import wiringpi as wpi
+import pathlib
 
 # facilitate asynchronous operations
 import os
@@ -55,6 +56,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         self.scans = {}
         self.scan_name = ''
         self.scan_part_count = 1
+        self.base_dir = os.path.join(str(pathlib.Path.home()), time.strftime('%Y%m%d'))
 
         self.image_associations = []
 
@@ -171,7 +173,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             self.refresh_camera_settings()
 
     def display_ftp(self):
-        ftp = ftpdialog.FTPDialog(self.config, self.cameras, self.image_associations, self.scans)
+        ftp = ftpdialog.FTPDialog(self.config, self.cameras, self.image_associations, self.scans, self.base_dir)
         if ftp.exec():
             # reset camera counts etc.            
             pass
