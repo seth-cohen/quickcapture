@@ -6,6 +6,10 @@ import dialogs.newscandialog_auto as newscandialog_auto
 NEW_PRODUCT = 0
 ADDITIONAL_PART = 1
 
+SKU = 0
+PROP = 1
+EXPERIMENT = 2
+OTHER = 3
 
 class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
     def __init__(self, is_first=False, scan_name=''):
@@ -14,11 +18,14 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
         
         self.scan_name = scan_name
         self.is_additional_part = False
+        self.scan_notes = ''
         
         if scan_name == '':
-            self.scan_name_input.setEnabled(True)
+            self.scan_name_input.setReadOnly(False)
+            self.subject_type.model().item(1).setSelectable(False)
 
-        self.scan_type.currentIndexChanged.connect(self.scan_type_changed)
+        self.scan_type = 'SKU'
+        self.subject_type.currentIndexChanged.connect(self.subject_type_changed)
         self.start_scan_button.clicked.connect(self.start_scan)
         self.cancel_button.clicked.connect(self.reject)
 
@@ -28,23 +35,25 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
             Qtw.QMessageBox.about(self, 'Error', 'Please enter name for scan')
             return
 
-        if self.scan_type.currentIndex == ADDITIONAL_PART:
+        if self.subject_type.currentIndex == ADDITIONAL_PART:
             self.scan_name += '(Part {})'.format(self.parts_count)
 
-        msgbox = Qtw.QMessageBox(self)
-        msgbox.addButton('Ready', Qtw.QMessageBox.AcceptRole)
-        msgbox.setWindowTitle('Prepare For Scan')
-        msgbox.setText('Place the object to scan on the turntable')
-        msgbox.exec()
-        self.accept()
+        self.scan_notes = self.scan_notes_input.toPlainText()
+        self.scan_type = self.scan_type_input.currentText()
 
+        Qtw.QMessageBox.warning(
+            self,
+            'Prepare For Scan',
+            'Before clicking `OK`, ensure that camera settings are correct and in focus. Then place the object to scan on the turntable.'
+        )
+        self.accept()
         
-    def scan_type_changed(self, i):
+    def subject_type_changed(self, i):
         if i == ADDITIONAL_PART:
-            self.scan_name_input.setText(self.scan_name)
-            self.scan_name_input.setEnabled(False)
+            self.scan_name_input.setText(self.scan_name + '-new part')
+            self.scan_name_input.setReadOnly(True)
             self.is_additional_part = True
         else:
             self.scan_name_input.setText('')
-            self.scan_name_input.setEnabled(True)
+            self.scan_name_input.setReadOnly(False)
             self.is_additional_part = False

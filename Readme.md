@@ -1,3 +1,12 @@
+## Pinout and connections
+- connector pins 2 and 4 for 5v power for relays.
+- connector pin 6 for ground
+- connector pin 22 (wiring pi pin 6) turntable
+- connector pin 24 (wirint pi pin 10) for camera 1 (top)
+- connector pin 26 (wirint pi pin 11) for camera 2 (top-middle)
+- connector pin 28 (wirint pi pin 31) for camera 3 (bottom-middle)
+- connector pin 32 (wirint pi pin 26) for camera 4 (bottom)
+
 ## Install virtual env
 - pip install virtual env
 - python3 -m venv ~/Venvs/qc

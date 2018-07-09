@@ -52,7 +52,7 @@ class CameraFactory():
 
             if has_attached_cameras == False:
                 print('No Cameras Detected')
-                Qtw.QMessageBox.about(
+                Qtw.QMessageBox.critical(
                     None,
                     'Error Detecting Cameras',
                     'No cameras were detected. Confirm that 4 cameras are attached'

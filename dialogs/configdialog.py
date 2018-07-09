@@ -88,6 +88,8 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
 
         if len(cams) > 0:
             self.config['CAMERAS'] = collections.OrderedDict(sorted(cams.items()))
+        elif len(self.config['CAMERAS']) == 0:
+            return Qtw.QMessageBox.critical(self, 'Camera Error', 'Please select camera locations')
 
         self.config['TURNTABLE']['timetorotate'] = self.turntable_period.text()
         self.config['TURNTABLE']['photosperscan'] = self.photos_per_scan.text()

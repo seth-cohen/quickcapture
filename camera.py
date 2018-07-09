@@ -33,7 +33,7 @@ class CameraTrigger():
         self.gpio.set_gpio(self.gpio_pin, direction)
 
 class Camera():
-    def __init__(self, trigger_pin, serial_num, position, completed_callback=None, trigger_with_usb=False):
+    def __init__(self, trigger_pin, serial_num, position, trigger_with_usb=False):
         # number of photos that this camera has taken since program start
         self.number_of_photos_taken = 0
 
@@ -44,21 +44,49 @@ class Camera():
         # Position of the camera, 0 being top camera
         self.position = position
 
+        self.files = {}
+        self.thread = None
+
+        self.aperture = 'N/A'
+        self.ISO = 'N/A'
+        self.focus_mode = 'N/A'
+        self.shutter_speed = 'N/A'
+        self.shoot_mode = 'N/A'
+        self.counter = 'N/A'
+        self.available = 'N/A'
+        self.lens = 'N/A'
+        self.serial_num = serial_num
+        self.model = 'N/A'
+        
         print('Cam on pin {} has serial number {}'.format(trigger_pin, serial_num))
         if not serial_num is None:
             self.camera = cf.CameraFactory.get_instance().get_camera(serial_num)
+            self.load_config_settings()
         else:
             self.camera = None
-
-        self.files = {}
-        self.file_save_callback = completed_callback
-        self.thread = None
+            
+    def load_config_settings(self):
+        if self.camera is not None:
+            config = self.camera.get_config()
+            
+            self.aperture = config.get_child_by_name('aperture').get_value()
+            self.ISO = config.get_child_by_name('iso').get_value()
+            self.focus_mode = config.get_child_by_name('focusmode').get_value()
+            self.shutter_speed = config.get_child_by_name('shutterspeed').get_value()
+            self.shoot_mode = config.get_child_by_name('autoexposuremode').get_value()
+            self.counter = config.get_child_by_name('shuttercounter').get_value()
+            self.available = config.get_child_by_name('availableshots').get_value()
+            self.lens = config.get_child_by_name('lensname').get_value()
+            self.model = config.get_child_by_name('cameramodel').get_value()
             
     async def take_photo(self, container=None):
         """Takes the actual photo
 
 
-        Triggers the camera either via USB or gpio pins
+        Triggers the camera either via USB or gpio pins. This is a coroutine called
+        via asyncio, so that multiple cameras can take photos at the same time without being blocked
+        returns the folder and name of the photo as saved on the device
+
         Args:
             container (str): The key that we want to associate the image with 
                 typically the name of the scan or 'initialization'
@@ -76,7 +104,6 @@ class Camera():
         else:
             self.camera.trigger_capture()
 
-        # ------ Experimental
         file_name = None
         folder = None
         while file_name is None:
@@ -84,23 +111,22 @@ class Camera():
 
         return self.handle_image_save(file_name, folder, container)
         
-        # ------ END Experimental
-        
-        #if self.thread is None:
-        #    print('====== Creating Thread for cam {} ======'.format(self.position))
-        #    self.thread = CameraEventThread(self.camera, 5.0, container)
-        #    self.thread.file_name_signal.connect(self.handle_image_save)
-        #    self.thread.daemon = True
-        #    self.thread.start()
-    
-    async def wait_for_event(self, wait_time):
+    async def wait_for_event(self, wait_time, event_to_wait=gp.GP_EVENT_FILE_ADDED):
+        """Listen for a total of wait_time seconds for a specific event
+
+        Cameras stream out a series of events while performing certain actions. There is a blocking
+        call in the libgphoto2 library that can wait for the events to be emitted. This coroutine
+        can run asynchronously to listen to events, specifically the file added event to 
+        know when images are actually saved.
+
+        """
         start = time.time()
         file_name = ''
         folder = ''
         while time.time() - start < wait_time:
             print('Waiting cam {}'.format(self.position))
             event = self.camera.wait_for_event(100)
-            if event[0] == gp.GP_EVENT_FILE_ADDED:
+            if event[0] == event_to_wait:
                 print('\t----==== file_saved ====----')
                 file_path_details = event[1]
                 file_name = file_path_details.name
@@ -112,18 +138,13 @@ class Camera():
         return (file_name, folder)
             
     def get_preview(self, file, folder):
-        # if self.camera is None:
-        #     print('No Camera attached')
-        #     return None
-        # 
-        # print('Capturing preview image')
-        # camera_file = self.camera.capture_preview()
-        # file_data = camera_file.get_data_and_size()
-        # return file_data
         try:
             print('\t----==== Capturing Preview for cam {}, file {} ====----'.format(self.position, file))
-            exif = self.camera.file_get(folder, file, gp.GP_FILE_TYPE_PREVIEW)
-            return exif.get_data_and_size()
+            start = time.time()
+            file = self.camera.file_get(folder, file, gp.GP_FILE_TYPE_PREVIEW)
+            data = file.get_data_and_size()
+            print('{} seconds to get file data'.format(time.time() - start))
+            return data
         except Exception as e:
             print(e)
              
@@ -146,7 +167,7 @@ class Camera():
 
         return save_details
         
-    def list_files(self, path='/'):
+    def list_all_files(self, path='/'):
         result = []
         if self.camera is None:
             return result
@@ -160,9 +181,13 @@ class Camera():
             folders.append(name)
         # recurse over subfolders
         for name in folders:
-            result.extend(self.list_files(os.path.join(path, name)))
+            result.extend(self.list_all_files(os.path.join(path, name)))
 
         return result
+
+    def list_files(self):
+        return [image for images in self.files.values() for image in images]
+
 
 class CameraEventThread(Qtc.QThread):
     """Waits for events to be registered from the camera
