@@ -14,3 +14,4 @@ DEFAULT_FTP_HOST = 'FTPPartner.wayfair.com'
 CONFIG_FILE = os.path.join(str(pathlib.Path.home()), '.quickcapture.conf')
 
 app = None
+

@@ -36,7 +36,6 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
             camera_settings = self.config['CAMERAS']
             for cam_num, camera_combo in enumerate(self.camera_combos):
                 camera_combo.addItem(camera_settings.get('Camera{}Serial'.format(cam_num + 1), '- No Camera Set -'))
-                camera_combo.setEditable(False)
         else:
             self.reset_camera_serial_options()
 
@@ -65,8 +64,12 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
         
         # Attach handlers for buttons
         self.camera_reset_button.clicked.connect(self.reset_camera_serial_options)
+        self.camera_search_button.clicked.connect(self.refresh_camera_list)
         self.unlock_ftp_button.clicked.connect(self.unlock_ftp_settings)
 
+    def refresh_camera_list(self):
+        cf.CameraFactory.get_instance().reset_cameras()
+        
     def reset_camera_serial_options(self):
         serial_options = ['- Select Camera Serial -']
         serial_options.extend(cf.CameraFactory.get_instance().get_camera_serials())

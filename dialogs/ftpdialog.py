@@ -68,24 +68,40 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.progress_bars.append(self.progress_3)
         self.progress_bars.append(self.progress_4)
 
+        self.ftp_progress_bars = {}
+        self.ftp_progress_bars['WF1'] = self.ftp_progress_1
+        self.ftp_progress_bars['WF2'] = self.ftp_progress_2
+        self.ftp_progress_bars['WF3'] = self.ftp_progress_3
+        self.ftp_progress_bars['WF4'] = self.ftp_progress_4
+        
+        self.ftp_speeds = {}
+        self.ftp_speeds['WF1'] = self.speed_1
+        self.ftp_speeds['WF2'] = self.speed_2
+        self.ftp_speeds['WF3'] = self.speed_3
+        self.ftp_speeds['WF4'] = self.speed_4
+        
+        self.ftp_speed_units = {}
+        self.ftp_speed_units['WF1'] = self.speed_unit_1
+        self.ftp_speed_units['WF2'] = self.speed_unit_2
+        self.ftp_speed_units['WF3'] = self.speed_unit_3
+        self.ftp_speed_units['WF4'] = self.speed_unit_4
+        
         self.dialog_buttons.button(Qtw.QDialogButtonBox.Ok).setText('Start Transfer')
+        self.existing_dir.clicked.connect(self.upload_existing_directory)
         
         self.copy_threads = {}
-        self.zip_thread = None
-        self.ftp_thread = None
+        self.ftp_threads = {}
 
-        if len(self.scan_details) == -1:
-            options = Qtw.QFileDialog.Options()
-            options |= Qtw.QFileDialog.ShowDirsOnly 
-            dir = Qtw.QFileDialog.getExistingDirectory(
-                self,
-                'Select Directory To Transfer or Cancel to copy camera files or go back and start new scan',
-                str(pathlib.Path.home()),
-                options
-            )
-            print(str(pathlib.Path.home()))
-            print(dir)
-
+    def upload_existing_directory(self):
+        options = Qtw.QFileDialog.Options()
+        options |= Qtw.QFileDialog.ShowDirsOnly 
+        dir = Qtw.QFileDialog.getExistingDirectory(
+            self,
+            'Select Directory To Transfer or Cancel to copy camera files or go back and start new scan',
+            str(pathlib.Path.home()),
+            options
+        )
+        self.begin_ftp_transfer(dir)
         
     def update_log(self, text):
         self.status_log.append(text)
@@ -93,12 +109,8 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
     def update_copy_progress(self, value, cam_num):
         self.progress_bars[cam_num].setValue(value)
 
-    def update_zip_progress(self, value):
-        print('Setting zip progress')
-        self.zip_progress.setValue(value)
-        
-    def update_ftp_progress(self, value):
-        self.ftp_progress.setValue(value)
+    def update_ftp_progress(self, value, key):
+        self.ftp_progress_bars[key].setValue(value)
 
     @Qtc.pyqtSlot(int)
     def handle_copy_thread_complete(self, thread_num):
@@ -115,57 +127,49 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             if self.is_canceled:
                 self.set_dialog_buttons_state(True)
             else:
-               self.zip_thread = ZipThread(self.get_base_dir())
-               
-               self.zip_thread.log_update_signal.connect(self.update_log)
-               self.zip_thread.progress_update_signal.connect(self.update_zip_progress)
-               self.zip_thread.finished.connect(self.handle_zip_thread_complete)
+                self.begin_ftp_transfer()
 
-               self.zip_thread.start()
-
-    @Qtc.pyqtSlot()
-    def handle_zip_thread_complete(self):
-        """Slot for the zip thread completion signal
-
-        Responds to the signal emitted whemn the zip thread is completed or canceled
-
-        """
-        print('Finished Zip Thread')
-        self.zip_thread = None
-        if self.is_canceled:
-            self.set_dialog_buttons_state(True)
-        else:
-            self.status_log.append('Starting FTP thread...')
-            self.ftp_thread = FTPThread(self.get_base_dir() + '.zip', self.config, True)
-
-            self.ftp_thread.log_update_signal.connect(self.update_log)
-            self.ftp_thread.progress_update_signal.connect(self.update_ftp_progress)
-            self.ftp_thread.speed_update_signal.connect(self.handle_speed_update)
-            self.ftp_thread.password_not_set_signal.connect(self.handle_password_not_set)
-            self.ftp_thread.ftp_error_signal.connect(self.handle_ftp_error)
-            self.ftp_thread.finished.connect(self.handle_ftp_thread_complete)
-
-            self.ftp_thread.start()
-            
-    @Qtc.pyqtSlot()
-    def handle_ftp_thread_complete(self):
+    @Qtc.pyqtSlot(str)
+    def handle_ftp_thread_complete(self, key):
         """Slot for the ftp thread completion signal
 
         Responds to the signal emitted whemn the ftp thread is completed or canceled
 
         """
-        self.ftp_thread = None
-        if self.is_canceled:
-            self.set_dialog_buttons_state(True)
-        else:
-            print('We are done ftp')
+        self.ftp_threads[key].quit()
+        self.ftp_threads[key].wait()
+        del self.ftp_threads[key]
 
-    @Qtc.pyqtSlot(int)
-    def handle_speed_update(self, value):
+        if len(self.ftp_threads) == 0:
+            if self.is_canceled:
+                self.set_dialog_buttons_state(True)
+            else:
+                print('We are done ftp')
+                Qtw.QMessageBox.about(
+                    self,
+                    'Transfer Complete',
+                    'Data transfer is complete. Please close down the app if you would like to shoot more scans'
+                )
+                self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setText('Close')
+                self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setEnabled(True)
+                self.existing_dir.setEnabled(True)
+
+    @Qtc.pyqtSlot(int, str)
+    def handle_speed_update(self, value, key):
         """Slot to update the FTP transfer speed
 
         """
-        self.speed.setText(str(value))
+        speed = '0'
+        if value > 1024:
+            value /= 1024
+            self.ftp_speed_units[key].setText('mbps')
+            speed = '{:.2f}'.format(value)
+        else:
+            self.ftp_speed_units[key].setText('kbps')
+            speed = str(value)
+        
+        self.ftp_speeds[key].setText(speed)
+        
 
     @Qtc.pyqtSlot()
     def handle_password_not_set(self):
@@ -228,10 +232,58 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
 
         if len(self.copy_threads) == 0:
             Qtw.QMessageBox.critical(self, 'No Images', 'There are no images from the current scan')
+        else:
+            self.existing_dir.setEnabled(False)
 
-    def ftp_transfer(self):
+    def begin_ftp_transfer(self, dir=None):
         base_dir = self.get_base_dir()
+        if dir is not None:
+            base_dir = dir
 
+        # Create the base directory on the FTP server if it doesn't already exist_ok
+        try:
+            conn = get_ftp_connection(self.config)
+        except ftp.all_errors as e:
+            self.handle_ftp_error(str(e))
+            return
+        except NoPasswordError as e:
+            self.handle_password_not_set()
+            return
+
+        # See if the directory already exists on the server, if not create it
+        try:
+           server_list = conn.nlst()
+           server_dir = os.path.basename(base_dir)
+           if server_dir not in server_list:
+               print('create directory on server {}'.format(server_dir))
+               conn.mkd(server_dir)
+        except ftp.all_errors as e:
+            self.handle_ftp_error(str(e))
+            return
+
+        # create files on server and spawn new thread to upload camera directories for all dirs
+        for node in os.listdir(base_dir):
+            local_node = os.path.join(base_dir, node)
+            remote_path = os.path.join(server_dir, node)
+            if os.path.isfile(local_node):
+                print('copy file {}'.format(local_node))
+                with open(local_node, 'rb') as file:
+                    conn.storbinary('STOR {}'.format(remote_path), file)
+            elif os.path.isdir(local_node):              
+                thread = FTPDirectoryThread(local_node, remote_path, self.config)
+                
+                # Connect the signals and slots
+                thread.progress_update_signal.connect(self.update_ftp_progress)
+                thread.speed_update_signal.connect(self.handle_speed_update)
+                thread.log_update_signal.connect(self.update_log)
+                thread.password_not_set_signal.connect(self.handle_password_not_set)
+                thread.ftp_error_signal.connect(self.handle_ftp_error)
+                thread.has_completed_signal.connect(self.handle_ftp_thread_complete)
+
+                thread.start()
+                print('FTP thread started')
+                self.ftp_threads[node] = thread
+            
     def get_base_dir(self):
         """Get the base directory to copy files to (defaults to current date)
 
@@ -251,7 +303,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             bool: Whether or not any threads are still attached
 
         """
-        return len(self.copy_threads) > 0 or self.zip_thread is not None or self.ftp_thread is not None
+        return len(self.copy_threads) > 0 or len(self.ftp_threads) > 0
 
     def set_dialog_buttons_state(self, should_enable=True):
         """Sets the state and title of the dialog buttons
@@ -269,7 +321,6 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setText('Cancel')
             self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setEnabled(True)
         else:
-                
             self.dialog_buttons.button(Qtw.QDialogButtonBox.Ok).setEnabled(False)
             self.dialog_buttons.button(Qtw.QDialogButtonBox.Ok).setText('Resume Transfer')
             self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setText('Pause')
@@ -278,7 +329,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         """Begins the transfer of files.
 
         The entire process is kicked off with this method. Copying files over from the cameras and then
-        once those are copmletely copied, will zip them, and finally FTP them over to our network
+        once those are copmletely copied and FTP them over to our network
 
         """
         self.is_canceled = False
@@ -286,6 +337,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         if len(self.copy_threads) == 0:
             self.set_dialog_buttons_state(False)
             self.copy_files_local()
+
 
     def reject(self):
         """Cancel button was pressed
@@ -297,11 +349,8 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         for k, thread in self.copy_threads.items():
             thread.is_canceled = True
 
-        if self.zip_thread is not None:
-            self.zip_thread.is_canceled = True
-
-        if self.ftp_thread is not None:
-            self.ftp_thread.is_canceled = True
+        for k, thread in self.ftp_threads.items():
+            thread.is_canceled = True
 
         self.is_canceled = True
         if not self.has_running_threads():
@@ -377,86 +426,7 @@ class CopyThread(Qtc.QThread):
 
         self.has_completed_signal.emit(self.camera.position)
 
-class ZipThread(Qtc.QThread):
-    """Class responsible for zipping all of the contents of a directory
-
-    Runs as a thread giving us the ability to cancel the thread at any point
-    Additionally, this thread will try to resume for where any previous attempts have left off
-
-    Attributes:/Download
-        is_canceled (bool): Whether or not to exit the thread
-        base_dir (str): The directory that we want to archive
-
-   """ 
-    log_update_signal = Qtc.pyqtSignal(str)
-    progress_update_signal = Qtc.pyqtSignal(int)
-
-    def __init__(self, base_dir, parent=None):
-        """Constuctor for the thread, just initializes serveral attributes
-        
-        Args:
-            parent (QObject): Parent PyQt5 object that this may belong to (default None)
-
-        """
-        super().__init__(parent)
-
-        self.is_canceled = False
-        self.base_dir = base_dir
-
-    def run(self):
-        """The workhorse of the thread class
-
-        This method will continue looping through all of the files in the base_dir attributes
-        and create an archive of the same name with the `zip` extension
-
-        """
-        base_dir = self.base_dir
-        self.zipfile = base_dir + '.zip'
-
-        # If we are continuing a previously canceled zip, we shouldn't
-        # have to re-write existing files
-        zipped_files_list = []
-        if os.path.isfile(self.zipfile):
-            with zip.ZipFile(self.zipfile, 'r') as zipped:
-                zipped_files_list.extend(zipped.namelist())
-        
-        with zip.ZipFile(self.zipfile, 'a', compression=zip.ZIP_DEFLATED) as zipit:
-            # quickly recurse to get total count of files to zip so
-            # so we can update progress bar
-            total_files = sum([len(files) for r, d, files in os.walk(base_dir)])
-            cur_file_num = 0
-
-            # os.walk built on listdir which doesn't gaurantee any order so let's sort the files and dirs
-            for base, dirs, files in os.walk(base_dir):
-                dirs.sort()
-                for file in sorted(files):
-                    # Main thread canceled us :(
-                    if self.is_canceled:
-                        break
-
-                    # os.walk returns `base` as the full path to get the the current directory it is traversing
-                    # this would lead to terrible archive structure as files within the zip would be nested deep
-                    # in the directory tree (like `zip_name/home/pi/Documents/YYYYMMDD/WF1/IMGXXXX.cr2`), yuck
-                    file_name = os.path.join(os.path.relpath(base, os.path.dirname(self.base_dir)), file)
-                    if not file_name in zipped_files_list:
-                        start = time.time()
-                        zipit.write(os.path.join(base, file), file_name)
-                        self.log_update_signal.emit('Zipping file: {}'.format(file))
-                        print('Time to Zip file {}'.format(time.time() - start))
-                    else:
-                        # Don't rewrite the files that have already been written before a pause or cancel and resume
-                        self.log_update_signal.emit('File {} already zipped. Skipping...'.format(file_name))
-                        print('File {} already zipped. Skipping...'.format(file_name))
-                        
-                        
-                    cur_file_num += 1
-                    self.progress_update_signal.emit(100 * (cur_file_num + 1) / total_files)
-
-        # We finished of our our accord so we should update the progress_bar 
-        if not self.is_canceled:
-            self.progress_update_signal.emit(100)
-                
-class FTPThread(Qtc.QThread):
+class FTPDirectoryThread(Qtc.QThread):
     """Class responsible for transferring a file or directory to the service
 
     Runs as a thread giving us the ability to cancel the thread at any point
@@ -476,12 +446,13 @@ class FTPThread(Qtc.QThread):
     # Signals for the main thread to bind to a slot to get updates from the thread
     # Yes, these need to be class variables or else PyQt5 will bind them to the class by default.
     log_update_signal = Qtc.pyqtSignal(str)
-    progress_update_signal = Qtc.pyqtSignal(int)
-    speed_update_signal = Qtc.pyqtSignal(int)
+    progress_update_signal = Qtc.pyqtSignal(int, str)
+    speed_update_signal = Qtc.pyqtSignal(int, str)
     password_not_set_signal = Qtc.pyqtSignal()
     ftp_error_signal = Qtc.pyqtSignal(str)
-
-    def __init__(self, file_path, config, append_if_exists=False, parent=None):
+    has_completed_signal = Qtc.pyqtSignal(str)
+    
+    def __init__(self, local_directory, remote_path, config, append_if_exists=False, parent=None):
         """Constuctor for the thread, just initializes serveral attributes
         
         Args:
@@ -493,145 +464,14 @@ class FTPThread(Qtc.QThread):
         super().__init__(parent)
 
         self.is_canceled = False
-        self.file_path = file_path
+        self.local_directory = local_directory
+        self.remote_path = remote_path
         self.config = config
+        self.server_parent_dir, self.server_basename = os.path.split(self.remote_path)
+        self.num_files_tranfered = 0
         self.bytes_transferred = 0
-        self.total_bytes = 0
-        self.conn = None
-        self.append_if_exists = append_if_exists
-
-    def run(self):
-        """The workhorse of the thread class
-
-        This method will continue looping through all of the files in the base_dir attributes
-        and create an archive of the same name with the `zip` extension
-
-        """
-        print('Beginning FTP transfer')
-        ftp_settings = self.config['FTP']
-        host = ftp_settings.get('host', consts.DEFAULT_FTP_HOST)
-        username = ftp_settings.get('username', '')
-        
-        # decrypt the hashed password
-        hash = base64.b64decode(ftp_settings.get('h', ''))
-        tag = base64.b64decode(ftp_settings.get('t', ''))
-        nonce = base64.b64decode(ftp_settings.get('n', ''))
-        key = base64.b64decode(ftp_settings.get('k', ''))
-        if len(hash) > 0 and len(tag) > 0 and len(nonce) > 0 and len(key) > 0:
-            cipher = AES.new(key, AES.MODE_EAX, nonce)
-            pw = cipher.decrypt_and_verify(hash, tag).decode('utf-8')
-        else:
-            self.password_not_set_signal.emit()
-            return
-
-        try:
-            self.conn = ftp.FTP(host, user=username, passwd=pw)
-        except ftp.all_errors as e:
-            self.ftp_error_signal.emit(str(e))
-            return
-            
-        # Get file size so we can calculate percentage left
-        self.total_bytes = os.path.getsize(self.file_path)
-        self.log_update_signal.emit('Connected to {}'.format(host))
-        self.log_update_signal.emit('File Size: {} bytes. File Name: {}'.format(self.total_bytes, self.file_path))
-
-        server_file = os.path.basename(self.file_path)
-        try:
-            if self.append_if_exists:
-                size_on_server = self.conn.size(server_file)
-                if size_on_server is not None:
-                    self.log_update_signal.emit('Server has {} bytes already... skipping'.format(size_on_server))
-                    self.bytes_transferred = size_on_server
-                    if size_on_server >= self.total_bytes:
-                        self.progress_update_signal.emit(100)
-                        return
-                    
-        except ftp.error_perm as e:
-            self.log_update_signal.emit(str(e))
-            pass
-
-        try:
-            # Open file for transfer
-            file = open(self.file_path, 'rb')
-            self.conn.storbinary('STOR {}'.format(server_file), file, callback=self.handle_transfer_block_complete, rest=self.bytes_transferred)
-        except Exception as e:
-            self.ftp_error_signal.emit(str(e))
-
-        self.conn.quit()
-                
-    @static_vars(start_time=None, bytes_last_update=0)
-    def handle_transfer_block_complete(self, block):
-        """The callback for ftplib to call when a block of data has been received by server
-
-        """
-        self.bytes_transferred += len(block)
-        self.progress_update_signal.emit(100 * self.bytes_transferred / self.total_bytes)
-        
-        if FTPThread.handle_transfer_block_complete.start_time is not None:
-            # Update transfer speed if 500 milliseconds has passed
-            # @TODO calculate time left for upload
-            elapsed = time.time() - FTPThread.handle_transfer_block_complete.start_time
-            if elapsed > 0.5:
-                bytes_transferred = self.bytes_transferred - FTPThread.handle_transfer_block_complete.bytes_last_update
-                speed = bytes_transferred / elapsed 
-                self.speed_update_signal.emit(int(speed / 1024))
-                
-                FTPThread.handle_transfer_block_complete.bytes_last_update = self.bytes_transferred
-                FTPThread.handle_transfer_block_complete.start_time = time.time()
-        else:
-            FTPThread.handle_transfer_block_complete.bytes_last_update = self.bytes_transferred
-            FTPThread.handle_transfer_block_complete.start_time = time.time()
-                
-        if self.is_canceled:
-            print('Cancelling FTP')
-            self.conn.quit()
-            self.conn = None
-
-            self.quit()
-            self.wait()
-
-class FTPRecursive(Qtc.QThread):
-    """Class responsible for transferring a file or directory to the service
-
-    Runs as a thread giving us the ability to cancel the thread at any point
-    Additionally, this thread will try to resume for where any previous attempts have left off 
-    by tracking the bytes that have been successfully transfered already
-
-    Attributes:
-        is_canceled (bool): Whether or not to exit the thread
-        file_path (str): The file that we want to transfer
-        config (object): The application configuration object
-        bytes_transferred (int): Number of bytes of this file already received by server
-        total_bytes (int): size in bytes of the file to transfer
-        conn (object): The FTP connection Object
-        append_if_exists (bool): When true will start the transfer at offset of size of file on server if exists
-
-   """ 
-    # Signals for the main thread to bind to a slot to get updates from the thread
-    # Yes, these need to be class variables or else PyQt5 will bind them to the class by default.
-    log_update_signal = Qtc.pyqtSignal(str)
-    progress_update_signal = Qtc.pyqtSignal(int)
-    speed_update_signal = Qtc.pyqtSignal(int)
-    password_not_set_signal = Qtc.pyqtSignal()
-    ftp_error_signal = Qtc.pyqtSignal(str)
-
-    def __init__(self, file_path, config, append_if_exists=False, parent=None):
-        """Constuctor for the thread, just initializes serveral attributes
-        
-        Args:
-            file_path (str): The path to the file that we want to send to server
-            config (ConfigParser): The configuration for the application
-            parent (QObject): Parent PyQt5 object that this may belong to (default None)
-
-        """
-        super().__init__(parent)
-
-        self.is_canceled = False
-        self.file_path = file_path
-        self.config = config
-        self.bytes_transferred = 0
-        self.total_bytes = 0
-        self.conn = None
+        self.bytes_last_update = 0
+        self.start_time = None
         self.append_if_exists = append_if_exists
 
     def run(self):
@@ -650,57 +490,91 @@ class FTPRecursive(Qtc.QThread):
             self.password_not_set_signal.emit()
             return
             
-        # Get file size so we can calculate percentage left
-        self.total_bytes = os.path.getsize(self.file_path)
-        self.log_update_signal.emit('Connected to {}'.format(host))
-        self.log_update_signal.emit('File Size: {} bytes. File Name: {}'.format(self.total_bytes, self.file_path))
 
-        server_file = os.path.basename(self.file_path)
+        # create the directory on the server if it doesn't exists
         try:
-            if self.append_if_exists:
-                size_on_server = self.conn.size(server_file)
-                if size_on_server is not None:
-                    self.log_update_signal.emit('Server has {} bytes already... skipping'.format(size_on_server))
-                    self.bytes_transferred = size_on_server
-                    if size_on_server >= self.total_bytes:
-                        self.progress_update_signal.emit(100)
-                        return
+            server_list = self.conn.nlst(self.server_parent_dir)
+            if self.server_basename not in server_list:
+                print('create directory on server {}'.format(self.remote_path))
+                self.conn.mkd(self.remote_path)
+        except ftp.all_errors as e:
+            self.handle_ftp_error(str(e))
+            return
+
+        # get the total file count to keep progress
+        self.total_files = sum([len(files) for r, d, files in os.walk(self.local_directory)])
+
+        # we will want to know list of all the files in the server directory so we don't send twice 
+        try:
+            server_files = {name: data for name, data in list(self.conn.mlsd(self.remote_path))}
+        except ftp.all_errors as e:
+            self.handle_ftp_error(str(e))
+            return
+        
+        # create files on server and spawn new thread to upload camera directories for all dirs
+        for node in sorted(os.listdir(self.local_directory)):
+            local_node = os.path.join(self.local_directory, node)
+            remote_path = os.path.join(self.remote_path, node)
+            rest = None
+            if os.path.isfile(local_node):
+                file_already_present = False
+                # check to see if the file exists
+                if node not in server_files:
+                    print('copy file {}'.format(local_node))
+                else:
+                    local_size = os.path.getsize(local_node)
+                    server_size = int(server_files[node]['size'])
+                    print('Server has {} of {} bytes...'.format(server_size, local_size))
+                    if local_size > server_size:
+                        # rest is the byte offset to start transferring from
+                        rest = server_size
+                    else:
+                        print('Skipping {}...'.format(remote_path))
+                        file_already_present = True
+
+                if not file_already_present:
+                    with open(local_node, 'rb') as file:
+                        try:
+                            if rest is not None:
+                                file.seek(rest)
+                            self.conn.storbinary('STOR {}'.format(remote_path), file, callback=self.handle_transfer_block_complete, rest=rest)
+                        except ftp.all_errors as e:
+                            self.ftp_error_signal.emit(str(e))
+                            break;
                     
-        except ftp.error_perm as e:
-            self.log_update_signal.emit(str(e))
-            pass
+            self.num_files_tranfered += 1
+            self.progress_update_signal.emit(100 * self.num_files_tranfered / self.total_files, self.server_basename)
 
-        try:
-            # Open file for transfer
-            file = open(self.file_path, 'rb')
-            self.conn.storbinary('STOR {}'.format(server_file), file, callback=self.handle_transfer_block_complete, rest=self.bytes_transferred)
-        except Exception as e:
-            self.ftp_error_signal.emit(str(e))
 
+        # We finished of our our accord so we should update the progress_bar 
+        if not self.is_canceled:
+            self.progress_update_signal.emit(100, self.server_basename)
+
+        self.has_completed_signal.emit(self.server_basename)
+        self.speed_update_signal.emit(0, self.server_basename)
         self.conn.quit()
+        self.conn = None
                 
-    @static_vars(start_time=None, bytes_last_update=0)
     def handle_transfer_block_complete(self, block):
         """The callback for ftplib to call when a block of data has been received by server
 
         """
         self.bytes_transferred += len(block)
-        self.progress_update_signal.emit(100 * self.bytes_transferred / self.total_bytes)
         
-        if FTPThread.handle_transfer_block_complete.start_time is not None:
+        if self.start_time is not None:
             # Update transfer speed if 500 milliseconds has passed
             # @TODO calculate time left for upload
-            elapsed = time.time() - FTPThread.handle_transfer_block_complete.start_time
+            elapsed = time.time() - self.start_time
             if elapsed > 0.5:
-                bytes_transferred = self.bytes_transferred - FTPThread.handle_transfer_block_complete.bytes_last_update
+                bytes_transferred = self.bytes_transferred - self.bytes_last_update
                 speed = bytes_transferred / elapsed 
-                self.speed_update_signal.emit(int(speed / 1024))
+                self.speed_update_signal.emit(int(speed / 1024), self.server_basename)
                 
-                FTPThread.handle_transfer_block_complete.bytes_last_update = self.bytes_transferred
-                FTPThread.handle_transfer_block_complete.start_time = time.time()
+                self.bytes_last_update = self.bytes_transferred
+                self.start_time = time.time()
         else:
-            FTPThread.handle_transfer_block_complete.bytes_last_update = self.bytes_transferred
-            FTPThread.handle_transfer_block_complete.start_time = time.time()
+            self.bytes_last_update = self.bytes_transferred
+            self.start_time = time.time()
                 
         if self.is_canceled:
             print('Cancelling FTP')
@@ -726,7 +600,6 @@ def get_ftp_connection(config):
     else:
         raise NoPasswordError()
 
-    print('Getting connection:\nHost: {}\nUser: {}\nPW: {}'.format(host, username, pw))
     return ftp.FTP(host, user=username, passwd=pw)
 
 class NoPasswordError(Exception):

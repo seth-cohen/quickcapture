@@ -24,6 +24,7 @@ class CameraTrigger():
             direction = gpio.HIGH
             
         self.gpio.set_with_duration(self.gpio_pin, direction, duration)
+        print(direction)
         
     def turn_off_gpio(self):
         direction = gpio.HIGH
@@ -33,12 +34,12 @@ class CameraTrigger():
         self.gpio.set_gpio(self.gpio_pin, direction)
 
 class Camera():
-    def __init__(self, trigger_pin, serial_num, position, trigger_with_usb=False):
+    def __init__(self, trigger_pin, serial_num, position, trigger_gpio_low=True, trigger_with_usb=False):
         # number of photos that this camera has taken since program start
         self.number_of_photos_taken = 0
 
         # rPi pin connected to camera to trigger
-        self.trigger = CameraTrigger(trigger_pin, True)
+        self.trigger = CameraTrigger(trigger_pin, trigger_gpio_low)
         self.trigger_with_usb = trigger_with_usb
 
         # Position of the camera, 0 being top camera

@@ -18,6 +18,11 @@ class CameraFactory():
             self.cameras = None
             CameraFactory.__instance = self
 
+    def reset_cameras(self):
+        self.release_camera_refs()
+        self.cameras = None
+        self.get_cameras()
+        
     def get_cameras(self):
         if self.cameras is None:
             self.cameras = {}
@@ -55,7 +60,13 @@ class CameraFactory():
                 Qtw.QMessageBox.critical(
                     None,
                     'Error Detecting Cameras',
-                    'No cameras were detected. Confirm that 4 cameras are attached'
+                    'No cameras were detected. Confirm that 4 cameras are attached via USB. Go into config and "Refresh Camera List"'
+                )
+            else:
+                Qtw.QMessageBox.about(
+                    None,
+                    'Cameras Detected',
+                    '{} camera(s) attached. If that is not correct confirm they are connected to USB then go into config and "Refresh Camera List"'.format(len(self.cameras))
                 )
         return self.cameras
 
@@ -69,8 +80,11 @@ class CameraFactory():
               
         print('Not Found') 
         return None
-    
-    def __del__(self):
+
+    def release_camera_refs(self):
         for k, v in self.cameras.items():
             print('exiting camera')
-            v[0].exit(context)
+            v[0].exit()
+
+    def __del__(self):
+        self.release_camera_refs()

@@ -28,6 +28,9 @@ import dialogs.newscandialog as scandialog
 import dialogs.messagedialog as msgdialog
 
 
+THUMBNAIL_TAB_INDEX = 0
+CAMERA_SETTINGS_TAB_INDEX = 1
+
 # create class for our Raspberry Pi GUI
 class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
     """MainWindow is the top level GUI window running in the main thread
@@ -74,22 +77,25 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         
     def setup_hardware(self):
         self.cameras = [];
-        for x in range(0, 4):
-            self.cameras.append(
-                camera.Camera(
-                    self.config['DEFAULTS']['camera{}pin'.format(x + 1)],
-                    self.config['CAMERAS'].get('camera{}serial'.format(x + 1), None),
-                    x
+        if 'DEFAULTS' in self.config and 'CAMERAS' in self.config:
+            for x in range(0, 4):
+                self.cameras.append(
+                    camera.Camera(
+                        self.config['DEFAULTS']['camera{}pin'.format(x + 1)],
+                        self.config['CAMERAS'].get('camera{}serial'.format(x + 1), None),
+                        x,
+                        self.config['DEFAULTS'].getboolean('triggerlow', False)
+                    )
                 )
-            )
 
-        turntable_data = self.config['TURNTABLE']
-        self.turntable = turntable.Turntable(
-            int(turntable_data.get('turntablepin', consts.DEFAULT_TURNTABLE_PIN)),
-            int(turntable_data.get('timetorotate', consts.DEFAULT_TURNTABLE_PERIOD)),
-            int(turntable_data.get('photosperscan', consts.DEFAULT_PHOTOS_PER_SCAN)),
-            float(turntable_data.get('delay', consts.DEFAULT_DELAY))
-        )
+        if 'TURNTABLE' in self.config:
+            turntable_data = self.config['TURNTABLE']
+            self.turntable = turntable.Turntable(
+                int(turntable_data.get('turntablepin', consts.DEFAULT_TURNTABLE_PIN)),
+                int(turntable_data.get('timetorotate', consts.DEFAULT_TURNTABLE_PERIOD)),
+                int(turntable_data.get('photosperscan', consts.DEFAULT_PHOTOS_PER_SCAN)),
+                float(turntable_data.get('delay', consts.DEFAULT_DELAY))
+            )
         
     def connect_ui(self):
         self.cam_counters = []
@@ -150,7 +156,8 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             'camera1pin': consts.DEFAULT_CAM_1_PIN,
             'camera2pin': consts.DEFAULT_CAM_2_PIN,
             'camera3pin': consts.DEFAULT_CAM_3_PIN,
-            'camera4pin': consts.DEFAULT_CAM_4_PIN
+            'camera4pin': consts.DEFAULT_CAM_4_PIN,
+            'triggerlow': False
         }
         self.config['TURNTABLE'] = {
             'timetorotate': consts.DEFAULT_TURNTABLE_PERIOD,
@@ -191,6 +198,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         """
         dialog = scandialog.NewScanDialog(len(self.scans) == 0, self.scan_name)
         if dialog.exec_():
+            self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
             self.scan_progress_container.show()
             
             scan_name = dialog.scan_name
@@ -344,6 +352,8 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             
 
     def initialization_shot(self):
+        # Set tab to camera preview tabWidget
+        self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
         print('============ Taking initialization shots ===============')
         self.take_photo_for_cams(range(len(self.cameras)))
 
