@@ -11,6 +11,7 @@ import base64
 import gphoto2 as gp
 import time
 import threading
+import io
 
 import dialogs.ftpdialog_auto as ftpdialog_auto
 import consts
@@ -129,8 +130,8 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             else:
                 self.begin_ftp_transfer()
 
-    @Qtc.pyqtSlot(str)
-    def handle_ftp_thread_complete(self, key):
+    @Qtc.pyqtSlot(str, str)
+    def handle_ftp_thread_complete(self, key, remote_path):
         """Slot for the ftp thread completion signal
 
         Responds to the signal emitted whemn the ftp thread is completed or canceled
@@ -144,6 +145,17 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             if self.is_canceled:
                 self.set_dialog_buttons_state(True)
             else:
+                print('Upload marker')
+                try:
+                    conn = get_ftp_connection(self.config)
+                    conn.storbinary('STOR {}'.format(os.path.join(remote_path, 'done')), io.BytesIO(b'true'))
+                except ftp.all_errors as e:
+                    self.handle_ftp_error(str(e))
+                    return
+                except NoPasswordError as e:
+                    self.handle_password_not_set()
+                    return
+
                 print('We are done ftp')
                 Qtw.QMessageBox.about(
                     self,
@@ -187,29 +199,6 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         
         self.status_log.append('Creating directory {}'.format(base_dir))
         os.makedirs(base_dir, exist_ok=True)
-
-        # generate the image association file
-        with open(os.path.join(base_dir, 'image_map.csv'), 'w+') as csv_file:
-            # Header
-            csv_file.write('File,Scan Name,Series Num,Camera Number,Image Type\n')
-            for image in self.image_associations:
-                csv_file.write(str(image))
-                
-        # generate the scan details text file
-        with open(os.path.join(base_dir, 'scan_details.csv'), 'w+') as csv_file:
-            # Camera Header
-            csv_file.write('Camera Details\nCam Position, Cam Model, Serial, Lens\n')
-            for cam in self.cameras:
-                csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
-                    
-            # Scan Header
-            csv_file.write('\nScan Details\nScan Name,Number of Series,Scan Type,Scan Notes\n')
-            for scan_name, part_details_list in self.scan_details.items():
-                num_parts = len(part_details_list)
-                for i, details in enumerate(part_details_list):
-                    if i > 0:
-                        scan_name += '-{}of{}'.format(i + 1, num_parts) 
-                    csv_file.write('{}, {}\n'.format(scan_name, str(details)))
         
         self.status_log.append('Begin copying files')
         for cam_num, camera in enumerate(self.cameras):
@@ -233,6 +222,28 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         if len(self.copy_threads) == 0:
             Qtw.QMessageBox.critical(self, 'No Images', 'There are no images from the current scan')
         else:
+            # generate the image association file
+            with open(os.path.join(base_dir, 'image_map.csv'), 'w+') as csv_file:
+                # Header
+                csv_file.write('File,Scan Name,Series Num,Camera Number,Image Type\n')
+                for image in self.image_associations:
+                    csv_file.write(str(image))
+
+            # generate the scan details text file
+            with open(os.path.join(base_dir, 'scan_details.csv'), 'w+') as csv_file:
+                # Camera Header
+                csv_file.write('Camera Details\nCam Position, Cam Model, Serial, Lens\n')
+                for cam in self.cameras:
+                    csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
+
+                # Scan Header
+                csv_file.write('\nScan Details\nScan Name,Number of Series,Scan Type,Scan Notes\n')
+                for scan_name, part_details_list in self.scan_details.items():
+                    num_parts = len(part_details_list)
+                    for i, details in enumerate(part_details_list):
+                        if i > 0:
+                            scan_name += '-{}of{}'.format(i + 1, num_parts) 
+                        csv_file.write('{}, {}\n'.format(scan_name, str(details)))
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):
@@ -450,7 +461,7 @@ class FTPDirectoryThread(Qtc.QThread):
     speed_update_signal = Qtc.pyqtSignal(int, str)
     password_not_set_signal = Qtc.pyqtSignal()
     ftp_error_signal = Qtc.pyqtSignal(str)
-    has_completed_signal = Qtc.pyqtSignal(str)
+    has_completed_signal = Qtc.pyqtSignal(str, str)
     
     def __init__(self, local_directory, remote_path, config, append_if_exists=False, parent=None):
         """Constuctor for the thread, just initializes serveral attributes
@@ -550,7 +561,7 @@ class FTPDirectoryThread(Qtc.QThread):
         if not self.is_canceled:
             self.progress_update_signal.emit(100, self.server_basename)
 
-        self.has_completed_signal.emit(self.server_basename)
+        self.has_completed_signal.emit(self.server_basename, self.server_parent_dir)
         self.speed_update_signal.emit(0, self.server_basename)
         self.conn.quit()
         self.conn = None
