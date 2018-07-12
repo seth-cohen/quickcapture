@@ -410,7 +410,7 @@ class CopyThread(Qtc.QThread):
             info = self.camera.get_file_info(file)
             folder, name = os.path.split(file)
 
-            self.log_update_signal.emit('File: {} downloading size: {}'.format(name, info.file.size))
+            self.log_update_signal.emit('File: {} copying size: {}'.format(name, info.file.size))
 
             cam_dir = os.path.join(self.base_dir,'WF{}'.format(self.camera.position + 1))
             os.makedirs(cam_dir, exist_ok=True)
