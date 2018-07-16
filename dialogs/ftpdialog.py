@@ -63,24 +63,28 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.host.setText(ftp_settings.get('host',  consts.DEFAULT_FTP_HOST))
         self.username.setText(ftp_settings.get('username', ''))
 
+        # progress bars for the file copy thread operation
         self.progress_bars = []
         self.progress_bars.append(self.progress_1)
         self.progress_bars.append(self.progress_2)
         self.progress_bars.append(self.progress_3)
         self.progress_bars.append(self.progress_4)
 
+        # progress bars for the file ftp transfer thread operation
         self.ftp_progress_bars = {}
         self.ftp_progress_bars['WF1'] = self.ftp_progress_1
         self.ftp_progress_bars['WF2'] = self.ftp_progress_2
         self.ftp_progress_bars['WF3'] = self.ftp_progress_3
         self.ftp_progress_bars['WF4'] = self.ftp_progress_4
         
+        # keeping track of data transfer speeds
         self.ftp_speeds = {}
         self.ftp_speeds['WF1'] = self.speed_1
         self.ftp_speeds['WF2'] = self.speed_2
         self.ftp_speeds['WF3'] = self.speed_3
         self.ftp_speeds['WF4'] = self.speed_4
         
+        # are we looking at kbps or mbps
         self.ftp_speed_units = {}
         self.ftp_speed_units['WF1'] = self.speed_unit_1
         self.ftp_speed_units['WF2'] = self.speed_unit_2
@@ -189,6 +193,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         
     @Qtc.pyqtSlot(str)
     def handle_ftp_error(self, error_message):
+        self.set_dialog_buttons_state(True)
         Qtw.QMessageBox.critical(self, 'FTP Error', error_message)
 
     def copy_files_local(self):
@@ -237,13 +242,13 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                     csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
 
                 # Scan Header
-                csv_file.write('\nScan Details\nScan Name,Number of Series,Scan Type,Scan Notes\n')
+                csv_file.write('\nScan Details\nScan ID,Number of Series,Scan Type,Scan Notes,Scan Name,Generate 3D Model?\n')
                 for scan_name, part_details_list in self.scan_details.items():
                     num_parts = len(part_details_list)
                     for i, details in enumerate(part_details_list):
                         if i > 0:
                             scan_name += '-{}of{}'.format(i + 1, num_parts) 
-                        csv_file.write('{}, {}\n'.format(scan_name, str(details)))
+                        csv_file.write('{},{}\n'.format(scan_name, str(details)))
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):
@@ -493,6 +498,7 @@ class FTPDirectoryThread(Qtc.QThread):
 
         """
         try:
+            self.log_update_signal.emit('Creating FTP Connection')
             self.conn = get_ftp_connection(self.config)
         except ftp.all_errors as e:
             self.ftp_error_signal.emit(str(e))
@@ -506,7 +512,8 @@ class FTPDirectoryThread(Qtc.QThread):
         try:
             server_list = self.conn.nlst(self.server_parent_dir)
             if self.server_basename not in server_list:
-                print('create directory on server {}'.format(self.remote_path))
+                print('create directory on server: {}'.format(self.remote_path))
+                self.log_update_signal.emit('create directory on server: {}'.format(self.remote_path))
                 self.conn.mkd(self.remote_path)
         except ftp.all_errors as e:
             self.handle_ftp_error(str(e))
@@ -532,20 +539,24 @@ class FTPDirectoryThread(Qtc.QThread):
                 # check to see if the file exists
                 if node not in server_files:
                     print('copy file {}'.format(local_node))
+                    self.log_update_signal.emit('copy file {}'.format(local_node))
                 else:
                     local_size = os.path.getsize(local_node)
                     server_size = int(server_files[node]['size'])
                     print('Server has {} of {} bytes...'.format(server_size, local_size))
+                    self.log_update_signal.emit('Server has {} of {} bytes...'.format(server_size, local_size))
                     if local_size > server_size:
                         # rest is the byte offset to start transferring from
                         rest = server_size
                     else:
                         print('Skipping {}...'.format(remote_path))
+                        self.log_update_signal.emit('Skipping {}...'.format(remote_path))
                         file_already_present = True
 
                 if not file_already_present:
                     with open(local_node, 'rb') as file:
                         try:
+                            # only send what the server doesn't already have... so we need to move the read cursor
                             if rest is not None:
                                 file.seek(rest)
                             self.conn.storbinary('STOR {}'.format(remote_path), file, callback=self.handle_transfer_block_complete, rest=rest)
@@ -610,7 +621,6 @@ def get_ftp_connection(config):
         pw = cipher.decrypt_and_verify(hash, tag).decode('utf-8')
     else:
         raise NoPasswordError()
-
     return ftp.FTP(host, user=username, passwd=pw)
 
 class NoPasswordError(Exception):

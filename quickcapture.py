@@ -1,3 +1,4 @@
+#!/home/pi/Venvs/qc/bin/python
 # This gets the Qt stuff
 import sys
 import PyQt5
@@ -42,13 +43,14 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         scans (dict of str: [ScanDetails]): Dictionary of scans key is name of scan and value is the scan details for each part
             tuple where first index is number of series and second is a string of notes/description of scan 
         scan_name (str): Name of the current scan
+        scan_part_id (str): Unique ID of the product being scanned. If a prop or experiment it defaults to scan name
         scan_part_count (int): Current part number of the current scan
         image_associations ([ImageAssociation]): List of ImageAssociations, mapping an image to the scan and photo type
         config (ConfigParser): Object to read and right application configuration
     
     """
     
-    def __init__(self):
+    def __init__(self, splash):
         """Initializes all variables and state for the application and sets up the UI
 
         """
@@ -58,21 +60,29 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
         self.scans = {}
         self.scan_name = ''
+        self.scan_part_id = ''
         self.scan_part_count = 1
         self.base_dir = os.path.join(str(pathlib.Path.home()), time.strftime('%Y%m%d_%H%M%S'))
 
         self.image_associations = []
 
+        splash.showMessage('Loading Configuration File')
         self.config = configparser.ConfigParser()
         self.config.read(consts.CONFIG_FILE)
         # if we don't already have a config file we should generate one
         if len(self.config.sections()) == 0:
             print('No Config file present')
+            splash.showMessage('No Config File Present')
             self.generate_default_config()
             self.display_config()
 
+        splash.showMessage('Setting Up Hardware')
         self.setup_hardware()
+
+        splash.showMessage('Grabbing Camera Settings')
         self.refresh_camera_settings()
+        
+        splash.showMessage('Setting Camera Preview Image')
         self.reset_previews()
         
     def setup_hardware(self):
@@ -126,15 +136,25 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
     def refresh_camera_settings(self):
         for cam_num, camera in enumerate(self.cameras):
-           self.cam_settings[cam_num]['aperture'].setText(camera.aperture)
-           self.cam_settings[cam_num]['shutter'].setText(camera.shutter_speed)
-           self.cam_settings[cam_num]['focus'].setText(camera.focus_mode)
-           self.cam_settings[cam_num]['iso'].setText(camera.ISO)
-           self.cam_settings[cam_num]['shoot'].setText(camera.shoot_mode)
-           self.cam_settings[cam_num]['lens'].setText(camera.lens)
-           self.cam_settings[cam_num]['counter'].setText(camera.counter)
-           self.cam_settings[cam_num]['available'].setText(camera.available)
-           
+            self.cam_settings[cam_num]['aperture'].setText(camera.aperture)
+            self.cam_settings[cam_num]['shutter'].setText(camera.shutter_speed)
+            self.cam_settings[cam_num]['focus'].setText(camera.focus_mode)
+            self.cam_settings[cam_num]['iso'].setText(camera.ISO)
+            self.cam_settings[cam_num]['shoot'].setText(camera.shoot_mode)
+            self.cam_settings[cam_num]['lens'].setText(camera.lens)
+            self.cam_settings[cam_num]['counter'].setText(camera.counter)
+
+            available_text = self.cam_settings[cam_num]['available']
+            available_text.setText(camera.available)
+            try:
+                print(int(camera.available))
+                if int(camera.available) < 60:
+                    available_text.setStyleSheet('QLabel{color:red; font-weight:bold}')
+                else:
+                    available_text.setStyleSheet('')
+            except ValueError:
+                pass
+               
     def reset_previews(self):
         """Place camera preview placeholder in place of the live feeds
         
@@ -196,41 +216,51 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         the turntable and capturing photos from all attached cameras.
 
         """
-        dialog = scandialog.NewScanDialog(len(self.scans) == 0, self.scan_name)
+        dialog = scandialog.NewScanDialog(len(self.scans) == 0, self.scan_name, self.scan_part_id)
         if dialog.exec_():
             self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
             self.scan_progress_container.show()
             
             scan_name = dialog.scan_name
+            scan_part_id = dialog.part_id if dialog.part_id != '' else scan_name 
             scan_notes = dialog.scan_notes
             scan_type = dialog.scan_type
+            generate_3d_model = dialog.should_generate_3d_model
             if dialog.is_additional_part:
                 self.scan_part_count += 1
             else:
                 self.scan_part_count = 1
 
             if self.scan_part_count > 1:
-                self.scan_name_label.setText('{} (Part {})'.format(scan_name, self.scan_part_count))
-                self.scans[scan_name].append(ScanDetails(1, scan_type, scan_notes))
+                self.scan_name_label.setText('{}{} (Part {})'.format(
+                    '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                    scan_name,
+                    self.scan_part_count
+                ))
+                self.scans[scan_part_id].append(ScanDetails(1, scan_type, scan_notes, scan_name, generate_3d_model))
             else:
-                self.scan_name_label.setText(scan_name)
-                self.scans[scan_name] = [ScanDetails(1, scan_type, scan_notes)]
+                self.scan_name_label.setText('{}{}'.format(
+                    '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                    scan_name
+                ))
+                self.scans[scan_part_id] = [ScanDetails(1, scan_type, scan_notes, scan_name, generate_3d_model)]
 
             self.scan_name = scan_name
+            self.scan_part_id = scan_part_id
             self.perform_scan_cycle()
 
-            orientation_image = Qtg.QPixmap()
-            orientation_image.load('orientation.png')
+            Qtw.QApplication.processEvents()
             while self.show_message_box(
                 'Start Scan Cycle',
                 'New Orientation',
                 'Would you like to shoot an additional orientation of this part?',
-                ('If you would like to shoot a new orientation of this same part'
-                 ' place it on it\'s side, adjust and refocus cameras. Then click `Start Scan Cycle` button'),
-                orientation_image,
+                ('If you would like to shoot a new orientation of this same part?'
+                 ' If yes, reposition the item on it\'s side, adjust and refocus cameras.'
+                 ' Then click `Start Scan Cycle` button to begin the process'),
+                get_pixmap('orientation.png'),
                 True
             ):
-                self.scans[scan_name][self.scan_part_count - 1].num_series += 1
+                self.scans[scan_part_id][self.scan_part_count - 1].num_series += 1
                 self.perform_scan_cycle()
 
     def waiting_on_previews(self):
@@ -255,6 +285,8 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             print('=============== LOOPING ================')
             if shot > 0:
                 self.turntable.rotate_slice()
+                self.textEdit.append('Delay {:.2f}sec before triggering photos'.format(self.turntable.delay))
+                time.sleep(self.turntable.delay)
             self.take_photo_for_cams(cam_list, True, 'scan')
 
             self.update_scan_progress(shot + 1)
@@ -265,27 +297,23 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
 
         Qtw.QApplication.processEvents()
-        background_image = Qtg.QPixmap()
-        background_image.load('background.png')
         self.show_message_box(
             'Take Photo',
             'Background Shot',
             'Take a photo of the empty stage for a background shot',
             'Remove object and then click the `Take Photo` button to shoot the empty stage and background',
-            background_image
+            get_pixmap('background.png')
         )
         self.take_photo_for_cams(cam_list, True, 'background')
         self.update_scan_progress(self.turntable.photos_per_scan + 1)
 
         Qtw.QApplication.processEvents()
-        checker_image = Qtg.QPixmap()
-        checker_image.load('colorcard.png')
         self.show_message_box(
             'Take Photo',
             'Color Checker',
             'Take photo of the stage with the color checker',
             'Ensure color checker is visible in each camera of the cameras and the click `Take Photo` button',
-            checker_image
+            get_pixmap('colorcard.png')
         )
         self.take_photo_for_cams(cam_list, True, 'colorcard')
         self.update_scan_progress(self.turntable.photos_per_scan + 2)
@@ -305,10 +333,13 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
     def take_photo_for_cams(self, which_cams, for_scan=False, type=None):
         # Name the bucket that we want to associate these images with
         association = 'initialization'
+        self.textEdit.append('Triggering Cameras')
+        Qtw.QApplication.processEvents()
+
         series = None
         if for_scan:
-            series = self.scans[self.scan_name][self.scan_part_count - 1].num_series
-            full_scan_name = self.scan_name
+            series = self.scans[self.scan_part_id][self.scan_part_count - 1].num_series
+            full_scan_name = self.scan_part_id
             if self.scan_part_count > 1:
                 full_scan_name += '-{}of'.format(self.scan_part_count)
             association = full_scan_name
@@ -384,24 +415,39 @@ class ImageAssociation():
 
     def __repr__(self):
         xstr = lambda v: '' if v is None else v
-        return '{}, {}, {}, {}, {}\n'.format(self.file_path, xstr(self.scan_name), xstr(self.series), self.camera_number, xstr(self.image_type))
+        return '{},{},{},{},{}\n'.format(self.file_path, xstr(self.scan_name), xstr(self.series), self.camera_number, xstr(self.image_type))
 
 class ScanDetails():
-    def __init__(self, num_series, type, notes):
+    def __init__(self, num_series, type, notes, scan_name, generate_3d_model):
         self.num_series = num_series
         self.type = type
         self.notes = notes
+        self.scan_name = scan_name
+        self.generate_3d_model = generate_3d_model
 
     def __repr__(self):
-        return '{}, {}, "{}"'.format(self.num_series, self.type, self.notes)
+        return '{},{},"{}","{}",{}'.format(self.num_series, self.type, self.notes, self.scan_name, self.generate_3d_model)
         
+def get_pixmap(name):
+    path = os.path.dirname(os.path.abspath(__file__))
+    image_path = os.path.join(path, name)
+    return Qtg.QPixmap(image_path)
+    
 # I feel better having one of these
 def main():
     # a new app instance
     consts.app = Qtw.QApplication(sys.argv)
     consts.app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    form = MainWindow()
+
+    splash_image = get_pixmap('splash.jpg')
+    splash = Qtw.QSplashScreen(splash_image)
+    splash.show()
+    consts.app.processEvents()
+    
+    # the main GUI window
+    form = MainWindow(splash)
     form.show()
+    splash.finish(form)
     
     # without this, the script exits immediately.
     sys.exit(consts.app.exec_())
