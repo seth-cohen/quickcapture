@@ -11,7 +11,7 @@ DEFAULT_CAM_3_PIN = 31
 DEFAULT_CAM_4_PIN = 26
 DEFAULT_FTP_HOST = 'FTPPartner.wayfair.com'
 
-CONFIG_FILE = os.path.join(str(pathlib.Path.home()), '.quickcapture.conf')
+CONFIG_FILE = os.path.join(str(pathlib.Path.home()), '.wayscan.conf')
 
 app = None
 

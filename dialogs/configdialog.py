@@ -29,7 +29,7 @@ class ConfigDialog(Qtw.QDialog, configdialog_auto.Ui_ConfigDialog):
 
         if self.config is None:
             self.config = conf.ConfigParser()
-            self.config.read('/home/pi/.quickcapture.conf')
+            self.config.read('/home/pi/.wayscan.conf')
             
         # try to get camera settings from config file
         if 'CAMERAS' in self.config:

@@ -67,7 +67,7 @@ This is a prblem because then gphoto2, in some firmware versions, will not be ab
   
   - Run the program from within the directory
   ```
-  $ python3 quickcapture.py
+  $ python3 wayscan.py
   ```
 ## On Mac
 - install QtCreator 

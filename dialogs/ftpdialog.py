@@ -57,7 +57,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
 
         if self.config is None:
             self.config = conf.ConfigParser()
-            self.config.read('/home/pi/.quickcapture.conf')
+            self.config.read('/home/pi/.wayscan.conf')
     
         ftp_settings = self.config['FTP']
         self.host.setText(ftp_settings.get('host',  consts.DEFAULT_FTP_HOST))
