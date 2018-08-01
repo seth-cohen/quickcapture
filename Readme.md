@@ -6,7 +6,10 @@
 - connector pin 26 (wirint pi pin 11) for camera 2 (top-middle)
 - connector pin 28 (wirint pi pin 31) for camera 3 (bottom-middle)
 - connector pin 32 (wirint pi pin 26) for camera 4 (bottom)
-
+- 4 port USB hub with cameras connected should be plugged into the bottom right of the 4
+usb ports on the device
+- Bluetooth Keyboard paired
+- USB mouse (unless BT keyboard is Mouse/Keyboard combo)
 ## Install virtual env
 - pip install virtual env
 - python3 -m venv ~/Venvs/qc
