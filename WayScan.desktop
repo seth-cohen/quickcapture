@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=WayScan
+Comment=WayfairNEXT 3DScanner
+Exec=/home/pi/Documents/WayScan/wayscan.py
+Icon=/home/pi/Documents/WayScan/logo.png
+Terminal=false
+MultipleArgs=false
+Type=Application
+Categories=Utility;
+StartupNotify=true

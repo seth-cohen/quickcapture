@@ -11,6 +11,9 @@ DEFAULT_CAM_3_PIN = 31
 DEFAULT_CAM_4_PIN = 26
 DEFAULT_FTP_HOST = 'FTPPartner.wayfair.com'
 
+DEFAULT_ETHERNET_USB_PORT = '1-1.1.1'
+DEFAULT_CAMERA_HUB_USB_PORT = '1-1.2'
+
 CONFIG_FILE = os.path.join(str(pathlib.Path.home()), '.wayscan.conf')
 
 app = None

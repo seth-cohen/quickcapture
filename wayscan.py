@@ -5,8 +5,10 @@ import PyQt5
 import PyQt5.QtWidgets as Qtw
 import PyQt5.QtGui as Qtg
 import PyQt5.QtCore as Qtc
+
 import wiringpi as wpi
 import pathlib
+import atexit
 
 # facilitate asynchronous operations
 import os
@@ -20,6 +22,7 @@ import configparser
 import camera
 import consts
 import turntable
+import usbcontroller
 
 # This is our window from QtCreator
 import mainwindow_auto as main
@@ -188,6 +191,10 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         self.config['FTP'] = {
             'Host': 'FTPPartner.wayfair.com'
         }
+        self.config['USB'] = {
+            'ethernet': consts.DEFAULT_ETHERNET_USB_PORT,
+            'camera_hub': consts.DEFAULT_CAMERA_HUB_USB_PORT
+        }
         
     def display_config(self):
         init = configdialog.ConfigDialog(self.config)
@@ -285,7 +292,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             print('=============== LOOPING ================')
             if shot > 0:
                 self.turntable.rotate_slice()
-                self.textEdit.append('Delay {:.2f}sec before triggering photos'.format(self.turntable.delay))
+                self.textEdit.append('Delay {:.2f}sec'.format(self.turntable.delay))
                 time.sleep(self.turntable.delay)
             self.take_photo_for_cams(cam_list, True, 'scan')
 
@@ -295,8 +302,6 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 time.sleep(0.01)
                 Qtw.QApplication.processEvents()
 
-
-        Qtw.QApplication.processEvents()
         self.show_message_box(
             'Take Photo',
             'Background Shot',
@@ -307,7 +312,9 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         self.take_photo_for_cams(cam_list, True, 'background')
         self.update_scan_progress(self.turntable.photos_per_scan + 1)
 
-        Qtw.QApplication.processEvents()
+        for i in range(10):
+            time.sleep(0.01)
+            Qtw.QApplication.processEvents()
         self.show_message_box(
             'Take Photo',
             'Color Checker',
@@ -317,6 +324,10 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         )
         self.take_photo_for_cams(cam_list, True, 'colorcard')
         self.update_scan_progress(self.turntable.photos_per_scan + 2)
+
+        for i in range(10):
+            time.sleep(0.01)
+            Qtw.QApplication.processEvents()
         print(self.scans)
 
     def show_message_box(self, button_text, title, text, informative_text=None, image=None, is_choice=False):
@@ -435,6 +446,9 @@ def get_pixmap(name):
     
 # I feel better having one of these
 def main():
+    usbcontroller.turn_ethernet_off()
+    atexit.register(usbcontroller.enable_all_usb)
+    
     # a new app instance
     consts.app = Qtw.QApplication(sys.argv)
     consts.app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())

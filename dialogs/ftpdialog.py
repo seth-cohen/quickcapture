@@ -15,6 +15,7 @@ import io
 
 import dialogs.ftpdialog_auto as ftpdialog_auto
 import consts
+import usbcontroller
 
 
 # Helper for static variables
@@ -132,6 +133,8 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             if self.is_canceled:
                 self.set_dialog_buttons_state(True)
             else:
+                usbcontroller.turn_ethernet_on()
+                time.sleep(1.0)
                 self.begin_ftp_transfer()
 
     @Qtc.pyqtSlot(str, str)
@@ -164,11 +167,9 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                 Qtw.QMessageBox.about(
                     self,
                     'Transfer Complete',
-                    'Data transfer is complete. Please close down the app if you would like to shoot more scans'
+                    'Data transfer is complete. The app will now close. To shoot additional scans open the app again'
                 )
-                self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setText('Close')
-                self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setEnabled(True)
-                self.existing_dir.setEnabled(True)
+                Qtw.QApplication.quit()
 
     @Qtc.pyqtSlot(int, str)
     def handle_speed_update(self, value, key):
