@@ -10,7 +10,7 @@ import Crypto.Cipher.AES as AES
 import base64
 import gphoto2 as gp
 import time
-import threading
+import subprocess
 import io
 
 import dialogs.ftpdialog_auto as ftpdialog_auto
@@ -134,7 +134,36 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                 self.set_dialog_buttons_state(True)
             else:
                 usbcontroller.turn_ethernet_on()
-                time.sleep(1.0)
+                # wait up to 5 seconds for ethernet to attach
+                self.update_log('Configuring Network')
+                Qtw.QApplication.processEvents()
+
+                start_time = time.time()
+                while time.time() - start_time < 5:
+                    ethernet_state = subprocess.check_output('cat /sys/class/net/eth0/operstate', shell=True)
+                    if ethernet_state.decode('utf-8').strip() == 'up':
+                        break
+                    time.sleep(0.2)
+
+                # wait up to 10 seconds for connection to network
+                # essentially try to ping google.com until it responds or
+                # 5 seconds passed
+                host = self.host.text()
+                self.update_log('Looking for {}'.format(host))
+                Qtw.QApplication.processEvents()
+
+                start_time = time.time()
+                while time.time() - start_time < 15:
+                    ping = subprocess.check_output('ping -qc 1 {} > /dev/null && echo ok || echo error'.format(host), shell=True)
+                    if ping.decode('utf-8').strip() == 'ok':
+                        self.update_log('Host Found')
+                        break
+                    else:
+                        self.update_log('Connecting to {}...'.format(host))
+                        Qtw.QApplication.processEvents()
+                    time.sleep(0.2)
+
+                Qtw.QApplication.processEvents()
                 self.begin_ftp_transfer()
 
     @Qtc.pyqtSlot(str, str)
