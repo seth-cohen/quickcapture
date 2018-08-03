@@ -369,6 +369,18 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             if response is not None and len(response) > 0:
                 cam = self.cameras[cam_num]
                 self.cam_counters[cam_num].display(cam.number_of_photos_taken)
+                
+                # Grab the thumbnail of the image to display, this way we can get an
+                # idea for the quality.
+                # @TODO see if we can get something higher quality than the thumbnail
+                preview = cam.get_preview(response['file'], response['dir'])
+                if preview is not None:
+                    preview_pixmap = Qtg.QPixmap()
+                    preview_pixmap.loadFromData(preview)
+
+                    thumbnail = self.cam_previews[cam_num]
+                    thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
+
                 self.textEdit.append('Cam {}: {}'.format(cam_num + 1, response['file']))
                 cam.load_config_settings()
                 self.refresh_camera_settings()
@@ -380,18 +392,6 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                     series,
                     type
                 ))
-                    
-                # Grab the thumbnail of the image to display, this way we can get an
-                # idea for the quality.
-                # @TODO see if we can get something higher quality than the thumbnail
-                preview = cam.get_preview(response['file'], response['dir'])
-                if preview is not None:
-                    preview_pixmap = Qtg.QPixmap()
-                    preview_pixmap.loadFromData(preview)
-
-                    thumbnail = self.cam_previews[cam_num]
-                    thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
-            
 
     def initialization_shot(self):
         # Set tab to camera preview tabWidget

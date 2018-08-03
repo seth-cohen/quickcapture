@@ -13,7 +13,9 @@ class Turntable():
     ):
         self.period = period
         self.photos_per_scan = photos_per_scan
-        self.rotation_duration = self.period / photos_per_scan
+
+        rotations = photos_per_scan - 1 if photos_per_scan > 1 else 1
+        self.rotation_duration = self.period / (photos_per_scan - 1)
         self.delay = delay
         self.gpio_pin = gpio_pin
         self.gpio = gpio.GpioController.get_instance()
