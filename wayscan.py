@@ -105,7 +105,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             turntable_data = self.config['TURNTABLE']
             self.turntable = turntable.Turntable(
                 int(turntable_data.get('turntablepin', consts.DEFAULT_TURNTABLE_PIN)),
-                int(turntable_data.get('timetorotate', consts.DEFAULT_TURNTABLE_PERIOD)),
+                float(turntable_data.get('timetorotate', consts.DEFAULT_TURNTABLE_PERIOD)),
                 int(turntable_data.get('photosperscan', consts.DEFAULT_PHOTOS_PER_SCAN)),
                 float(turntable_data.get('delay', consts.DEFAULT_DELAY))
             )
