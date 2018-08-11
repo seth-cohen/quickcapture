@@ -1,5 +1,4 @@
 import time
-import asyncio
 import consts
 import gpiocontroller as gpio
 

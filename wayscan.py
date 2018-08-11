@@ -287,6 +287,15 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         cam_list = range(len(self.cameras))
         print('~===-*^% Photos per scan {}'.format(self.turntable.photos_per_scan))
 
+        # Drain the event queue from anything that may have happened outside of the
+        # wayscan application
+        coroutines = []
+        for cam in self.cameras:
+            coroutines.append(cam.clear_events(3.0))
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.gather(*coroutines))
+
         self.update_scan_progress(0)
         for shot in range(self.turntable.photos_per_scan):
             print('=============== LOOPING ================')
@@ -373,6 +382,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 # Grab the thumbnail of the image to display, this way we can get an
                 # idea for the quality.
                 # @TODO see if we can get something higher quality than the thumbnail
+                #       can call Camera.get_lens_preview() for higher detail - a little slower
                 preview = cam.get_preview(response['file'], response['dir'])
                 if preview is not None:
                     preview_pixmap = Qtg.QPixmap()
@@ -383,7 +393,6 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
                 self.textEdit.append('Cam {}: {}'.format(cam_num + 1, response['file']))
                 cam.load_config_settings()
-                self.refresh_camera_settings()
 
                 self.image_associations.append(ImageAssociation(
                     response['file'],
@@ -392,6 +401,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                     series,
                     type
                 ))
+        self.refresh_camera_settings()
 
     def initialization_shot(self):
         # Set tab to camera preview tabWidget

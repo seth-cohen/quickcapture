@@ -41,17 +41,21 @@ class CameraFactory():
                     camera.set_port_info(port_info_list[idx])
                     camera.init(context)
 
-                    camera_config = camera.get_config(context)
-                    serial = camera_config.get_child_by_name('eosserialnumber') 
+                    config = camera.get_config(context)
+                    serial = config.get_child_by_name('eosserialnumber')
                     self.cameras[serial.get_value()] = (camera, {'port_index': idx})
 
-                    # Setup all of the cameras to save to memory card vs. internal RAM
-                    capture_target = camera_config.get_child_by_name('capturetarget')
-                    capture_target.set_value(capture_target.get_choice(1))
+                    try:
+                        output = config.get_child_by_name('output')
+                        output.set_value(output.get_choice(0))
 
-                    # Setup all of the cameras to save to output to the TFT
-                    output = camera_config.get_child_by_name('output')
-                    output.set_value(output.get_choice(1))
+                        vf = config.get_child_by_name('viewfinder')
+                        vf.set_value(0)
+
+                        camera.set_config(config)
+                    except Exception as e:
+                        print(e)
+                
                 except Exception as e:
                     print(e)
 

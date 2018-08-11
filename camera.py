@@ -111,7 +111,7 @@ class Camera():
             file_name, folder = await self.wait_for_event(5.0)
 
         return self.handle_image_save(file_name, folder, container)
-        
+
     async def wait_for_event(self, wait_time, event_to_wait=gp.GP_EVENT_FILE_ADDED):
         """Listen for a total of wait_time seconds for a specific event
 
@@ -125,22 +125,41 @@ class Camera():
         file_name = ''
         folder = ''
         while time.time() - start < wait_time:
-            print('Waiting cam {}'.format(self.position))
-            event = self.camera.wait_for_event(100)
+            event = self.camera.wait_for_event(10)
             if event[0] == event_to_wait:
-                print('\t----==== file_saved ====----')
                 file_path_details = event[1]
                 file_name = file_path_details.name
                 folder = file_path_details.folder
-                self.number_of_photos_taken += 1
+                print('\t----==== Cam {} - file_saved {} ====----'.format(self.position, file_name))
                 break
             await asyncio.sleep(0.01)
 
+        if file_name is not None and folder is not None:
+            self.number_of_photos_taken += 1
+
         return (file_name, folder)
             
+    async def clear_events(self, wait_time=2.0):
+        """Clear as many of the events as we can for the specified time
+
+        When connected to the camera events are buffered and only read out when requested.
+        This can lead to the file_added event not being called for the latest file but
+        instead for a file previously saved
+
+        Call this to ensure that any events that were triggered before we care are discarded
+        """
+        start = time.time()
+        while time.time() - start < wait_time:
+            event = self.camera.wait_for_event(10)
+            if event[0] == gp.GP_EVENT_FILE_ADDED:
+                print('clearing image from {}'.format(self.position))
+            await asyncio.sleep(0.01)
+
+        return True
+
     def get_preview(self, file, folder):
         try:
-            print('\t----==== Capturing Preview for cam {}, file {} ====----'.format(self.position, file))
+            print('\t----==== Grabbing Thumbnail for cam {}, file {} ====----'.format(self.position, file))
             start = time.time()
             file = self.camera.file_get(folder, file, gp.GP_FILE_TYPE_PREVIEW)
             data = file.get_data_and_size()
@@ -149,6 +168,29 @@ class Camera():
         except Exception as e:
             print(e)
              
+        return None
+
+    def get_lens_preview(self):
+        try:
+            print('\t----==== Grabbing Preview for cam {} ====----'.format(self.position))
+            start = time.time()
+
+            file = self.camera.capture_preview()
+            data = file.get_data_and_size()
+            print('{} seconds to get file data'.format(time.time() - start))
+
+            config = self.camera.get_config()
+            output = config.get_child_by_name('output')
+            output.set_value(output.get_choice(3))
+
+            vf = config.get_child_by_name('viewfinder')
+            vf.set_value(0)
+            self.camera.set_config(config)
+
+            return data
+        except Exception as e:
+            print(e)
+
         return None
 
     def get_file_info(self, path):
@@ -189,36 +231,3 @@ class Camera():
     def list_files(self):
         return [image for images in self.files.values() for image in images]
 
-
-class CameraEventThread(Qtc.QThread):
-    """Waits for events to be registered from the camera
-
-    Useful so we can fire and forget and still get alerted when images
-    are actually saved to disk
-
-    """
-    file_name_signal = Qtc.pyqtSignal(str, str, str)
-    def __init__(self, camera, wait_time, container=None):
-        super().__init__()
-        self.camera = camera
-        self.wait_time = wait_time
-        self.container = container
-
-    def run(self):
-        start = time.time()
-        file_name = ''
-        folder = ''
-        while time.time() - start < self.wait_time:
-            event = self.camera.wait_for_event(200)
-            if event[0] == gp.GP_EVENT_FILE_ADDED:
-                print('====== file_saved ======')
-                file_path_details = event[1]
-                file_name = file_path_details.name
-                folder = file_path_details.folder
-                break
-        
-        self.file_name_signal.emit(
-            file_name,
-            folder,
-            self.container
-        )
