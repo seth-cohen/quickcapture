@@ -184,7 +184,10 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                 print('Upload marker')
                 try:
                     conn = get_ftp_connection(self.config)
-                    conn.storbinary('STOR {}'.format(os.path.join(remote_path, 'done')), io.BytesIO(b'true'))
+                    conn.storbinary(
+                        'STOR {}'.format(os.path.join(remote_path, 'needs_sorting')),
+                        io.BytesIO(b'true')
+                    )
                 except ftp.all_errors as e:
                     self.handle_ftp_error(str(e))
                     return
@@ -260,7 +263,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             # generate the image association file
             with open(os.path.join(base_dir, 'image_map.csv'), 'w+') as csv_file:
                 # Header
-                csv_file.write('File,Scan Name,Series Num,Camera Number,Image Type\n')
+                csv_file.write('File,Scan Name,Series Num,Camera Number,Image Type, Aperture, ISO, shutter\n')
                 for image in self.image_associations:
                     csv_file.write(str(image))
 

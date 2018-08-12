@@ -399,7 +399,10 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                     cam_num,
                     association,
                     series,
-                    type
+                    type,
+                    cam.aperture,
+                    cam.ISO,
+                    cam.shutter_speed
                 ))
         self.refresh_camera_settings()
 
@@ -427,16 +430,28 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             wpi.digitalWrite(pin, 1)
 
 class ImageAssociation():
-    def __init__(self, file_path, camera, scan_name, series, image_type):
+    def __init__(self, file_path, camera, scan_name, series, image_type, aperture, ISO, shutter_speed):
         self.camera_number = camera
         self.scan_name = scan_name
         self.series = series
         self.image_type = image_type
+        self.aperture = aperture
+        self.ISO = ISO
+        self.shutter_speed = shutter_speed
         self.file_path = file_path
 
     def __repr__(self):
         xstr = lambda v: '' if v is None else v
-        return '{},{},{},{},{}\n'.format(self.file_path, xstr(self.scan_name), xstr(self.series), self.camera_number, xstr(self.image_type))
+        return '{},{},{},{},{},{},{},{}\n'.format(
+            self.file_path,
+            xstr(self.scan_name),
+            xstr(self.series),
+            self.camera_number,
+            xstr(self.image_type),
+            xstr(self.aperture),
+            xstr(self.ISO),
+            xstr(self.shutter_speed)
+        )
 
 class ScanDetails():
     def __init__(self, num_series, type, notes, scan_name, generate_3d_model):
