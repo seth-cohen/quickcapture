@@ -361,7 +361,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             series = self.scans[self.scan_part_id][self.scan_part_count - 1].num_series
             full_scan_name = self.scan_part_id
             if self.scan_part_count > 1:
-                full_scan_name += '-{}of'.format(self.scan_part_count)
+                full_scan_name += '-{}ofX'.format(self.scan_part_count)
             association = full_scan_name
 
         coroutines = []

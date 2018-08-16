@@ -280,7 +280,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                     num_parts = len(part_details_list)
                     for i, details in enumerate(part_details_list):
                         if i > 0:
-                            scan_name += '-{}of{}'.format(i + 1, num_parts) 
+                            scan_name += '-{}ofX'.format(i + 1) 
                         csv_file.write('{},{}\n'.format(scan_name, str(details)))
             self.existing_dir.setEnabled(False)
 
