@@ -8,8 +8,11 @@ ADDITIONAL_PART = 1
 
 SKU = 0
 PROP = 1
-EXPERIMENT = 2
-OTHER = 3
+OTHER = 2
+
+PRODUCTION = 0
+EXPERIMENT = 1
+
 
 class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
     def __init__(self, is_first=False, scan_name='', part_id=''):
@@ -27,9 +30,9 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
             self.mfg_part_id_input.setReadOnly(False)
             self.subject_type.model().item(1).setSelectable(False)
 
-        self.scan_type = 'SKU'
+        self.object_type = 'SKU'
         self.subject_type.currentIndexChanged.connect(self.subject_type_changed)
-        self.scan_type_input.currentIndexChanged.connect(self.scan_type_changed)
+        self.object_type_input.currentIndexChanged.connect(self.object_type_changed)
         self.start_scan_button.clicked.connect(self.start_scan)
         self.cancel_button.clicked.connect(self.reject)
 
@@ -37,7 +40,7 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
         self.scan_name = self.scan_name_input.text()
         self.part_id = self.mfg_part_id_input.text()
         missing_scan_name = self.scan_name == ''
-        missing_part_id = self.part_id == '' and self.scan_type_input.currentIndex() == SKU
+        missing_part_id = self.part_id == '' and self.object_type_input.currentIndex() == SKU
 
         if missing_scan_name or missing_part_id:
             Qtw.QMessageBox.about(self, 'Error', '{}{}'.format(
@@ -50,8 +53,9 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
             self.scan_name += '(Part {})'.format(self.parts_count)
 
         self.scan_notes = self.scan_notes_input.toPlainText()
-        self.scan_type = self.scan_type_input.currentText()
+        self.object_type = self.object_type_input.currentText()
         self.should_generate_3d_model = self.generate_3d_model_input.isChecked()
+        self.scan_type = self.scan_type_input.currentText()
 
         Qtw.QMessageBox.warning(
             self,
@@ -74,7 +78,7 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
             self.scan_name_input.setReadOnly(False)
             self.is_additional_part = False
 
-    def scan_type_changed(self, i):
+    def object_type_changed(self, i):
         if i == SKU:
             self.part_label.show()
             self.mfg_part_id_input.show()

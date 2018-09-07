@@ -1,10 +1,21 @@
+"""
+Class representing the Dialog box and logic presented
+to the user when transferring data from the cameras to
+the PI and over FTP
+
+Python version 3.6
+
+@author    Seth Cohen <scohen@wayfair.com>
+@copyright 2018 Wayfair LLC - All rights reserved
+
+"""
+
 import os
 import PyQt5.QtWidgets as Qtw
 import PyQt5.QtCore as Qtc
 import PyQt5.QtGui as Qtg
 import configparser as conf
 import ftplib as ftp
-import zipfile as zip
 import pathlib
 import Crypto.Cipher.AES as AES
 import base64
@@ -99,6 +110,9 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.ftp_threads = {}
 
     def upload_existing_directory(self):
+        # ensure that the ethernet USB controller is on
+        usbcontroller.turn_ethernet_on()
+
         options = Qtw.QFileDialog.Options()
         options |= Qtw.QFileDialog.ShowDirsOnly 
         dir = Qtw.QFileDialog.getExistingDirectory(
@@ -275,7 +289,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                     csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
 
                 # Scan Header
-                csv_file.write('\nScan Details\nScan ID,Number of Series,Scan Type,Scan Notes,Scan Name,Generate 3D Model?\n')
+                csv_file.write('\nScan Details\nScan ID,Number of Series,Scan Type,Object Type,Scan Notes,Scan Name,Generate 3D Model?\n')
                 for scan_name, part_details_list in self.scan_details.items():
                     num_parts = len(part_details_list)
                     for i, details in enumerate(part_details_list):
