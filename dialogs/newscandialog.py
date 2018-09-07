@@ -15,7 +15,7 @@ EXPERIMENT = 1
 
 
 class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
-    def __init__(self, is_first=False, scan_name='', part_id=''):
+    def __init__(self, is_first=False, scan_name='', part_id='', all_scan_names=[]):
         super().__init__()
         self.setupUi(self)
         
@@ -24,6 +24,7 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
         self.is_additional_part = False
         self.scan_notes = ''
         self.should_generate_3d_model = True
+        self.all_scan_names = all_scan_names
         
         if scan_name == '':
             self.scan_name_input.setReadOnly(False)
@@ -48,6 +49,20 @@ class NewScanDialog(Qtw.QDialog, newscandialog_auto.Ui_NewScanDialog):
                 '- Please enter Product ID\n' if missing_part_id else '',
             ))
             return
+
+        if (self.is_additional_part == False
+            and (self.scan_name in self.all_scan_names
+                 or self.part_id in self.all_scan_names)):
+            Qtw.QMessageBox.about(
+                self,
+                'Error: Name in use',
+                ('Either the prop name, or sku part id {} is already in use.'
+                 ' Perhaps Subject type should be Additional Part,'
+                 ' or Additional Orientation. If not please update' 
+                 ' the name or part id'.format(self.scan_name))
+            )
+            return
+
 
         if self.subject_type.currentIndex == ADDITIONAL_PART:
             self.scan_name += '(Part {})'.format(self.parts_count)

@@ -223,7 +223,12 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         the turntable and capturing photos from all attached cameras.
 
         """
-        dialog = scandialog.NewScanDialog(len(self.scans) == 0, self.scan_name, self.scan_part_id)
+        dialog = scandialog.NewScanDialog(
+            len(self.scans) == 0,
+            self.scan_name,
+            self.scan_part_id,
+            list(self.scans.keys())
+        )
         if dialog.exec_():
             self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
             self.scan_progress_container.show()
