@@ -241,25 +241,34 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             generate_3d_model = dialog.should_generate_3d_model
             if dialog.is_additional_part:
                 self.scan_part_count += 1
+            elif dialog.is_additional_orientation:
+                # continue where we left off but increment series
+                self.scans[scan_part_id][self.scan_part_count - 1].num_series += 1
             else:
                 self.scan_part_count = 1
 
-            if self.scan_part_count > 1:
-                self.scan_name_label.setText('{}{} (Part {})'.format(
-                    '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
-                    scan_name,
-                    self.scan_part_count
-                ))
-                self.scans[scan_part_id].append(ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model))
-            else:
-                self.scan_name_label.setText('{}{}'.format(
-                    '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
-                    scan_name
-                ))
-                self.scans[scan_part_id] = [ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model)]
+            # if this was an oops moment and we are actually trying to
+            # shoot an additional orientation of the previous
+            # part then everythin is already set up
+            if not dialog.is_additional_orientation:
+                if self.scan_part_count > 1:
+                    self.scan_name_label.setText('{}{} (Part {})'.format(
+                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                        scan_name,
+                        self.scan_part_count
+                    ))
+                    self.scans[scan_part_id].append(ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model))
+                else:
+                    self.scan_name_label.setText('{}{}'.format(
+                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                        scan_name
+                    ))
+                    self.scans[scan_part_id] = [ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model)]
 
-            self.scan_name = scan_name
-            self.scan_part_id = scan_part_id
+                self.scan_name = scan_name
+                self.scan_part_id = scan_part_id
+
+            # start the scan cycle
             self.perform_scan_cycle()
 
             Qtw.QApplication.processEvents()
