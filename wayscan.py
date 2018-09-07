@@ -292,8 +292,8 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         # Drain the event queue from anything that may have happened outside of the
         # wayscan application
         coroutines = []
-        for cam in self.cameras:
-            coroutines.append(cam.clear_events(3.0))
+        for cam_num in cam_list:
+            coroutines.append(self.cameras[cam_num].clear_events(3.0))
 
         loop = asyncio.get_event_loop()
         loop.run_until_complete(asyncio.gather(*coroutines))

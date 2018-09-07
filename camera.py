@@ -148,12 +148,13 @@ class Camera():
 
         Call this to ensure that any events that were triggered before we care are discarded
         """
-        start = time.time()
-        while time.time() - start < wait_time:
-            event = self.camera.wait_for_event(10)
-            if event[0] == gp.GP_EVENT_FILE_ADDED:
-                print('clearing image from {}'.format(self.position))
-            await asyncio.sleep(0.01)
+        if self.camera is not None:
+            start = time.time()
+            while time.time() - start < wait_time:
+                event = self.camera.wait_for_event(10)
+                if event[0] == gp.GP_EVENT_FILE_ADDED:
+                    print('clearing image from {}'.format(self.position))
+                await asyncio.sleep(0.01)
 
         return True
 
