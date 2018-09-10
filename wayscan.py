@@ -223,7 +223,12 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         the turntable and capturing photos from all attached cameras.
 
         """
-        dialog = scandialog.NewScanDialog(len(self.scans) == 0, self.scan_name, self.scan_part_id)
+        dialog = scandialog.NewScanDialog(
+            len(self.scans) == 0,
+            self.scan_name,
+            self.scan_part_id,
+            list(self.scans.keys())
+        )
         if dialog.exec_():
             self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
             self.scan_progress_container.show()
@@ -231,41 +236,52 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             scan_name = dialog.scan_name
             scan_part_id = dialog.part_id if dialog.part_id != '' else scan_name 
             scan_notes = dialog.scan_notes
+            object_type = dialog.object_type
             scan_type = dialog.scan_type
             generate_3d_model = dialog.should_generate_3d_model
             if dialog.is_additional_part:
                 self.scan_part_count += 1
+            elif dialog.is_additional_orientation:
+                # continue where we left off but increment series
+                self.scans[scan_part_id][self.scan_part_count - 1].num_series += 1
             else:
                 self.scan_part_count = 1
 
-            if self.scan_part_count > 1:
-                self.scan_name_label.setText('{}{} (Part {})'.format(
-                    '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
-                    scan_name,
-                    self.scan_part_count
-                ))
-                self.scans[scan_part_id].append(ScanDetails(1, scan_type, scan_notes, scan_name, generate_3d_model))
-            else:
-                self.scan_name_label.setText('{}{}'.format(
-                    '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
-                    scan_name
-                ))
-                self.scans[scan_part_id] = [ScanDetails(1, scan_type, scan_notes, scan_name, generate_3d_model)]
+            # if this was an oops moment and we are actually trying to
+            # shoot an additional orientation of the previous
+            # part then everythin is already set up
+            if not dialog.is_additional_orientation:
+                if self.scan_part_count > 1:
+                    self.scan_name_label.setText('{}{} (Part {})'.format(
+                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                        scan_name,
+                        self.scan_part_count
+                    ))
+                    self.scans[scan_part_id].append(ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model))
+                else:
+                    self.scan_name_label.setText('{}{}'.format(
+                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                        scan_name
+                    ))
+                    self.scans[scan_part_id] = [ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model)]
 
-            self.scan_name = scan_name
-            self.scan_part_id = scan_part_id
+                self.scan_name = scan_name
+                self.scan_part_id = scan_part_id
+
+            # start the scan cycle
             self.perform_scan_cycle()
 
             Qtw.QApplication.processEvents()
             while self.show_message_box(
                 'Start Scan Cycle',
                 'New Orientation',
-                'Would you like to shoot an additional orientation of this part?',
-                ('If you would like to shoot a new orientation of this same part?'
-                 ' If yes, reposition the item on it\'s side, adjust and refocus cameras.'
-                 ' Then click `Start Scan Cycle` button to begin the process'),
+                'Reorient item for additional scan series',
+                ('Invert, place on its side or otherwise position the subject'
+                 ' to capture additional data. When prepared, select "Start Scan Cycle."'
+                 ' When you have scanned all needed orientations select New Part/Item'),
                 get_pixmap('orientation.png'),
-                True
+                True,
+                no_button_text='New Part/Item'
             ):
                 self.scans[scan_part_id][self.scan_part_count - 1].num_series += 1
                 self.perform_scan_cycle()
@@ -290,8 +306,8 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         # Drain the event queue from anything that may have happened outside of the
         # wayscan application
         coroutines = []
-        for cam in self.cameras:
-            coroutines.append(cam.clear_events(3.0))
+        for cam_num in cam_list:
+            coroutines.append(self.cameras[cam_num].clear_events(3.0))
 
         loop = asyncio.get_event_loop()
         loop.run_until_complete(asyncio.gather(*coroutines))
@@ -339,14 +355,15 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             Qtw.QApplication.processEvents()
         print(self.scans)
 
-    def show_message_box(self, button_text, title, text, informative_text=None, image=None, is_choice=False):
+    def show_message_box(self, button_text, title, text, informative_text=None, image=None, is_choice=False, no_button_text=None):
         msgbox = msgdialog.MessageDialog(
             button_text,
             title,
             text,
             informative_text,
             image,
-            is_choice
+            is_choice,
+            no_button_text
         )
         return msgbox.exec_()
         
@@ -429,6 +446,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         else:
             wpi.digitalWrite(pin, 1)
 
+
 class ImageAssociation():
     def __init__(self, file_path, camera, scan_name, series, image_type, aperture, ISO, shutter_speed):
         self.camera_number = camera
@@ -453,22 +471,36 @@ class ImageAssociation():
             xstr(self.shutter_speed)
         )
 
+    
 class ScanDetails():
-    def __init__(self, num_series, type, notes, scan_name, generate_3d_model):
+    def __init__(self, num_series, scan_type, object_type, notes, scan_name, generate_3d_model):
         self.num_series = num_series
-        self.type = type
+        self.scan_type = scan_type
+        self.object_type = object_type
         self.notes = notes
         self.scan_name = scan_name
         self.generate_3d_model = generate_3d_model
 
     def __repr__(self):
-        return '{},{},"{}","{}",{}'.format(self.num_series, self.type, self.notes, self.scan_name, self.generate_3d_model)
+        """How the object should be represented when casted to string
+
+        """
+        return '{},{},{},"{}","{}",{}'.format(
+            self.num_series,
+            self.scan_type,
+            self.object_type,
+            self.notes,
+            self.scan_name,
+            self.generate_3d_model
+        )
         
+
 def get_pixmap(name):
     path = os.path.dirname(os.path.abspath(__file__))
     image_path = os.path.join(path, name)
     return Qtg.QPixmap(image_path)
     
+
 # I feel better having one of these
 def main():
     usbcontroller.turn_ethernet_off()
