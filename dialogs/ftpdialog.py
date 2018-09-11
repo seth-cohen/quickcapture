@@ -112,16 +112,47 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
     def upload_existing_directory(self):
         # ensure that the ethernet USB controller is on
         usbcontroller.turn_ethernet_on()
-
         options = Qtw.QFileDialog.Options()
-        options |= Qtw.QFileDialog.ShowDirsOnly 
+
+        options |= Qtw.QFileDialog.ShowDirsOnly
         dir = Qtw.QFileDialog.getExistingDirectory(
             self,
             'Select Directory To Transfer or Cancel to copy camera files or go back and start new scan',
             str(pathlib.Path.home()),
             options
         )
-        self.begin_ftp_transfer(dir)
+
+        if dir:
+            # wait up to 5 seconds for ethernet to attach
+            self.update_log('Configuring Network')
+            Qtw.QApplication.processEvents()
+
+            start_time = time.time()
+            while time.time() - start_time < 5:
+                ethernet_state = subprocess.check_output('cat /sys/class/net/eth0/operstate', shell=True)
+                if ethernet_state.decode('utf-8').strip() == 'up':
+                    break
+                time.sleep(0.2)
+
+            # wait up to 10 seconds for connection to network
+            # essentially try to ping google.com until it responds or
+            # 5 seconds passed
+            host = self.host.text()
+            self.update_log('Looking for {}'.format(host))
+            Qtw.QApplication.processEvents()
+
+            start_time = time.time()
+            while time.time() - start_time < 15:
+                ping = subprocess.check_output('ping -qc 1 {} > /dev/null && echo ok || echo error'.format(host), shell=True)
+                if ping.decode('utf-8').strip() == 'ok':
+                    self.update_log('Host Found')
+                    break
+                else:
+                    self.update_log('Connecting to {}...'.format(host))
+                    Qtw.QApplication.processEvents()
+                time.sleep(0.2)
+
+            self.begin_ftp_transfer(dir)
         
     def update_log(self, text):
         self.status_log.append(text)

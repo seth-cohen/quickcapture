@@ -34,6 +34,8 @@ def turn_ethernet_off():
 def enable_all_usb():
     ethernet_port, camera_port = get_ports()
     
+    bind_usb_port(ethernet_port, False)
+    bind_usb_port(camera_port, False)
     bind_usb_port(ethernet_port, True)
     bind_usb_port(camera_port, True)
     
