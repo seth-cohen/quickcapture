@@ -91,14 +91,14 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         st = os.statvfs(os.path.expanduser('~'))
         gigs_free = st.f_bavail * st.f_frsize / 1024 / 1024 / 1024
 
-        if gigs_free < 200:
+        if gigs_free < 20:
             Qtw.QMessageBox.critical(
                 self,
                 'Low Free Disk Space',
                 ('Please delete old desktop directories '
-                 'space is down to {:.2f} GB remaining.'
+                 'space is down to {:.2f} GB remaining. '
                  'Open file explorer to "/home/pi/ and delete '
-                 'the dated directories only YYYYMMDD_XXXXXX'.format(gigs_free))
+                 'the dated directories only (YYYYMMDD_XXXXXX)'.format(gigs_free))
             )
         
     def setup_hardware(self):
