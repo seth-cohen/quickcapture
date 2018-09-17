@@ -324,9 +324,10 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                 for scan_name, part_details_list in self.scan_details.items():
                     num_parts = len(part_details_list)
                     for i, details in enumerate(part_details_list):
+                        name_for_csv = scan_name
                         if i > 0:
-                            scan_name += '-{}ofX'.format(i + 1) 
-                        csv_file.write('{},{}\n'.format(scan_name, str(details)))
+                            name_for_csv += '-{}ofX'.format(i + 1) 
+                        csv_file.write('{},{}\n'.format(name_for_csv, str(details)))
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):
