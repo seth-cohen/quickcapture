@@ -503,7 +503,7 @@ class ScanDetails():
             self.scan_type,
             self.object_type,
             self.notes.replace('"', '""'),
-            self.scan_name,
+            self.scan_name.replace('"', '""'),
             self.generate_3d_model
         )
         
