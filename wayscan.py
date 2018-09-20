@@ -502,7 +502,7 @@ class ScanDetails():
             self.num_series,
             self.scan_type,
             self.object_type,
-            self.notes,
+            self.notes.replace('"', '""'),
             self.scan_name,
             self.generate_3d_model
         )
