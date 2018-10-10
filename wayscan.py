@@ -283,38 +283,8 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
                 self.scan_name = scan_name
                 self.scan_part_id = scan_part_id
-                
-                # create new line
-                name_for_csv = scan_name
-                if self.scan_part_count > 1:
-                    name_for_csv += '-{}ofX'.format(self.scan_part_count)
 
-                scan_details = os.path.join(self.base_dir, 'scan_details.csv')
-                with open(scan_details, 'a') as csv_file:
-                    csv_file.write('{},{}\n'.format(
-                        name_for_csv,
-                        str(self.scans[scan_part_id][self.scan_part_count - 1])
-                    ))
-            else:
-                # overwrite the last line, just need to increment series count
-                scan_details = os.path.join(self.base_dir, 'scan_details.csv')
-                lines = []
-                with open(scan_details, 'r') as csv_file:
-                    lines = csv_file.readlines()
-
-                # Update last line with new series number
-                name_for_csv = scan_name
-                if self.scan_part_count > 1:
-                    name_for_csv += '-{}ofX'.format(self.scan_part_count)
-
-                lines[-1] = '{},{}\n'.format(
-                    name_for_csv,
-                    str(self.scans[scan_part_id][self.scan_part_count - 1])
-                )
-                with open(scan_details, 'w') as csv_file:
-                    for line in lines:
-                        csv_file.write(line)
-
+            self.write_to_scan_details(overwrite_line=dialog.is_additional_orientation)
             # start the scan cycle
             self.perform_scan_cycle()
 
@@ -331,7 +301,35 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 no_button_text='New Part/Item'
             ):
                 self.scans[scan_part_id][self.scan_part_count - 1].num_series += 1
+                self.write_to_scan_details(overwrite_line=True)
                 self.perform_scan_cycle()
+
+    def write_to_scan_details(self, overwrite_line=False):
+        name_for_csv = self.scan_name
+        if self.scan_part_count > 1:
+            name_for_csv += '-{}ofX'.format(self.scan_part_count)
+
+        scan_details = os.path.join(self.base_dir, 'scan_details.csv')
+        if not overwrite_line:
+            # create new line
+            with open(scan_details, 'a') as csv_file:
+                csv_file.write('{},{}\n'.format(
+                    name_for_csv,
+                    str(self.scans[self.scan_part_id][self.scan_part_count - 1])
+                ))
+        else:
+            # overwrite the last line, just need to increment series count
+            lines = []
+            with open(scan_details, 'r') as csv_file:
+                lines = csv_file.readlines()
+
+            lines[-1] = '{},{}\n'.format(
+                name_for_csv,
+                str(self.scans[self.scan_part_id][self.scan_part_count - 1])
+            )
+            with open(scan_details, 'w') as csv_file:
+                for line in lines:
+                    csv_file.write(line)
 
     def waiting_on_previews(self):
         for cam in self.cameras:
@@ -468,6 +466,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                     csv_file.write(str(image))
 
     def initialization_shot(self):
+        self.create_files_if_necessary()
         # Set tab to camera preview tabWidget
         self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
         print('============ Taking initialization shots ===============')
@@ -502,7 +501,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 # Header
                 csv_file.write('File,Scan ID,Series Num,Camera Num,Image Type,Aperture,ISO,Shutter,Directory\n')
 
-        scan_details = os.path.join(base_dir, 'scan_details.csv')
+        scan_details = os.path.join(self.base_dir, 'scan_details.csv')
         if not os.path.exists(scan_details):
             # generate the scan details text file
             with open(scan_details, 'w+') as csv_file:
