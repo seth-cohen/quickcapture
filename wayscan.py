@@ -527,7 +527,7 @@ class ImageAssociation():
 
     def __repr__(self):
         xstr = lambda v: '' if v is None else v
-        return '{},{},{},{},{},{},{},{}\n'.format(
+        return '{},{},{},{},{},{},{},{},{}\n'.format(
             self.file_path,
             xstr(self.scan_name),
             xstr(self.series),
