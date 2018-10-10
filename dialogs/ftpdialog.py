@@ -37,6 +37,7 @@ def static_vars(**kwargs):
         return func
     return decorate
 
+
 class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
     """Implementation of Dialog box that handles processes related to transfering files
 
@@ -305,29 +306,29 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         if len(self.copy_threads) == 0:
             Qtw.QMessageBox.critical(self, 'No Images', 'There are no images from the current scan')
         else:
-            # generate the image association file
-            with open(os.path.join(base_dir, 'image_map.csv'), 'w+') as csv_file:
-                # Header
-                csv_file.write('File,Scan ID,Series Num,Camera Num,Image Type,Aperture,ISO,Shutter\n')
-                for image in self.image_associations:
-                    csv_file.write(str(image))
+            ## generate the image association file
+            #with open(os.path.join(base_dir, 'image_map.csv'), 'w+') as csv_file:
+            #    # Header
+            #    csv_file.write('File,Scan ID,Series Num,Camera Num,Image Type,Aperture,ISO,Shutter\n')
+            #    for image in self.image_associations:
+            #        csv_file.write(str(image))
 
             # generate the scan details text file
-            with open(os.path.join(base_dir, 'scan_details.csv'), 'w+') as csv_file:
-                # Camera Header
-                csv_file.write('Camera Details\nCam Position, Cam Model, Serial, Lens\n')
-                for cam in self.cameras:
-                    csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
+            #with open(os.path.join(base_dir, 'scan_details.csv'), 'w+') as csv_file:
+            #    # Camera Header
+            #    csv_file.write('Camera Details\nCam Position, Cam Model, Serial, Lens\n')
+            #    for cam in self.cameras:
+            #        csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
 
-                # Scan Header
-                csv_file.write('\nScan Details\nScan ID,Number of Series,Scan Type,Object Type,Scan Notes,Scan Name,Generate 3D Model?\n')
-                for scan_name, part_details_list in self.scan_details.items():
-                    num_parts = len(part_details_list)
-                    for i, details in enumerate(part_details_list):
-                        name_for_csv = scan_name
-                        if i > 0:
-                            name_for_csv += '-{}ofX'.format(i + 1) 
-                        csv_file.write('{},{}\n'.format(name_for_csv, str(details)))
+            #    # Scan Header
+            #    csv_file.write('\nScan Details\nScan ID,Number of Series,Scan Type,Object Type,Scan Notes,Scan Name,Generate 3D Model?\n')
+            #    for scan_name, part_details_list in self.scan_details.items():
+            #        num_parts = len(part_details_list)
+            #        for i, details in enumerate(part_details_list):
+            #            name_for_csv = scan_name
+            #            if i > 0:
+            #                name_for_csv += '-{}ofX'.format(i + 1) 
+            #            csv_file.write('{},{}\n'.format(name_for_csv, str(details)))
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):

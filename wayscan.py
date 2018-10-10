@@ -35,6 +35,7 @@ import dialogs.messagedialog as msgdialog
 THUMBNAIL_TAB_INDEX = 0
 CAMERA_SETTINGS_TAB_INDEX = 1
 
+
 # create class for our Raspberry Pi GUI
 class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
     """MainWindow is the top level GUI window running in the main thread
@@ -88,6 +89,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         splash.showMessage('Setting Camera Preview Image')
         self.reset_previews()
 
+        # Let's ensure that we have at least 20GB available space
         st = os.statvfs(os.path.expanduser('~'))
         gigs_free = st.f_bavail * st.f_frsize / 1024 / 1024 / 1024
 
@@ -243,6 +245,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             list(self.scans.keys())
         )
         if dialog.exec_():
+            self.create_files_if_necessary()
             self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
             self.scan_progress_container.show()
             
@@ -280,6 +283,37 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
                 self.scan_name = scan_name
                 self.scan_part_id = scan_part_id
+                
+                # create new line
+                name_for_csv = scan_name
+                if self.scan_part_count > 1:
+                    name_for_csv += '-{}ofX'.format(self.scan_part_count)
+
+                scan_details = os.path.join(self.base_dir, 'scan_details.csv')
+                with open(scan_details, 'a') as csv_file:
+                    csv_file.write('{},{}\n'.format(
+                        name_for_csv,
+                        str(self.scans[scan_part_id][self.scan_part_count - 1])
+                    ))
+            else:
+                # overwrite the last line, just need to increment series count
+                scan_details = os.path.join(self.base_dir, 'scan_details.csv')
+                lines = []
+                with open(scan_details, 'r') as csv_file:
+                    lines = csv_file.readlines()
+
+                # Update last line with new series number
+                name_for_csv = scan_name
+                if self.scan_part_count > 1:
+                    name_for_csv += '-{}ofX'.format(self.scan_part_count)
+
+                lines[-1] = '{},{}\n'.format(
+                    name_for_csv,
+                    str(self.scans[scan_part_id][self.scan_part_count - 1])
+                )
+                with open(scan_details, 'w') as csv_file:
+                    for line in lines:
+                        csv_file.write(line)
 
             # start the scan cycle
             self.perform_scan_cycle()
@@ -335,10 +369,9 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             self.take_photo_for_cams(cam_list, True, 'scan')
 
             self.update_scan_progress(shot + 1)
+
             # Ensure that the GUI updates to show the new preview
-            for i in range(10):
-                time.sleep(0.01)
-                Qtw.QApplication.processEvents()
+            Qtw.QApplication.processEvents()
 
         self.show_message_box(
             'Take Photo',
@@ -350,9 +383,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         self.take_photo_for_cams(cam_list, True, 'background')
         self.update_scan_progress(self.turntable.photos_per_scan + 1)
 
-        for i in range(10):
-            time.sleep(0.01)
-            Qtw.QApplication.processEvents()
+        Qtw.QApplication.processEvents()
         self.show_message_box(
             'Take Photo',
             'Color Checker',
@@ -363,9 +394,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         self.take_photo_for_cams(cam_list, True, 'colorcard')
         self.update_scan_progress(self.turntable.photos_per_scan + 2)
 
-        for i in range(10):
-            time.sleep(0.01)
-            Qtw.QApplication.processEvents()
+        Qtw.QApplication.processEvents()
         print(self.scans)
 
     def show_message_box(self, button_text, title, text, informative_text=None, image=None, is_choice=False, no_button_text=None):
@@ -401,46 +430,55 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         loop = asyncio.get_event_loop()
         responses = loop.run_until_complete(asyncio.gather(*coroutines))
 
-        for i, cam_num in enumerate(which_cams):
-            response = responses[i]
+        with open(os.path.join(self.base_dir, 'image_map.csv'), 'a') as csv_file:
+            for i, cam_num in enumerate(which_cams):
+                response = responses[i]
 
-            # if response is not none then the camera shot succeeded
-            if response is not None and len(response) > 0:
-                cam = self.cameras[cam_num]
-                self.cam_counters[cam_num].display(cam.number_of_photos_taken)
-                
-                # Grab the thumbnail of the image to display, this way we can get an
-                # idea for the quality.
-                # @TODO see if we can get something higher quality than the thumbnail
-                #       can call Camera.get_lens_preview() for higher detail - a little slower
-                preview = cam.get_preview(response['file'], response['dir'])
-                if preview is not None:
-                    preview_pixmap = Qtg.QPixmap()
-                    preview_pixmap.loadFromData(preview)
+                # if response is not none then the camera shot succeeded
+                if response is not None and len(response) > 0:
+                    cam = self.cameras[cam_num]
+                    self.cam_counters[cam_num].display(cam.number_of_photos_taken)
 
-                    thumbnail = self.cam_previews[cam_num]
-                    thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
+                    # Grab the thumbnail of the image to display, this way we can get an
+                    # idea for the quality.
+                    # @TODO see if we can get something higher quality than the thumbnail
+                    #       can call Camera.get_lens_preview() for higher detail - a little slower
+                    preview = cam.get_preview(response['file'], response['dir'])
+                    if preview is not None:
+                        preview_pixmap = Qtg.QPixmap()
+                        preview_pixmap.loadFromData(preview)
 
-                self.textEdit.append('Cam {}: {}'.format(cam_num + 1, response['file']))
-                cam.load_config_settings()
+                        thumbnail = self.cam_previews[cam_num]
+                        thumbnail.setPixmap(preview_pixmap.scaled(thumbnail.width(), thumbnail.height(), Qtc.Qt.KeepAspectRatio))
 
-                self.image_associations.append(ImageAssociation(
-                    response['file'],
-                    cam_num,
-                    association,
-                    series,
-                    type,
-                    cam.aperture,
-                    cam.ISO,
-                    cam.shutter_speed
-                ))
-        self.refresh_camera_settings()
+                    self.textEdit.append('Cam {}: {}'.format(cam_num + 1, response['file']))
+
+                    image = ImageAssociation(
+                        response['file'],
+                        response['dir'],
+                        cam_num,
+                        association,
+                        series,
+                        type,
+                        cam.aperture,
+                        cam.ISO,
+                        cam.shutter_speed
+                    )
+                    self.image_associations.append(image)
+                    csv_file.write(str(image))
 
     def initialization_shot(self):
         # Set tab to camera preview tabWidget
         self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
         print('============ Taking initialization shots ===============')
-        self.take_photo_for_cams(range(len(self.cameras)))
+        which_cams = range(len(self.cameras))
+        self.take_photo_for_cams(which_cams)
+
+        # Update camera settings for initialization shots
+        for i, cam_num in enumerate(which_cams):
+            self.cameras[cam_num].load_config_settings()
+
+        self.refresh_camera_settings()
 
     def update_config(self):
         """This method is called any time our configuration has changed
@@ -453,15 +491,31 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         with open(consts.CONFIG_FILE, 'w+') as config_file:
             self.config.write(config_file)
 
-    def toggle_pin(self, pinsoreview):
-        if wpi.digitalRead(pin) == 1:
-            wpi.digitalWrite(pin, 0)
-        else:
-            wpi.digitalWrite(pin, 1)
+    def create_files_if_necessary(self):
+        # Make the base_dir now, so we can write image data to it realtime
+        os.makedirs(self.base_dir, exist_ok=True)
 
+        image_map = os.path.join(self.base_dir, 'image_map.csv')
+        if not os.path.exists(image_map):
+            # generate the image association file
+            with open(image_map, 'w+') as csv_file:
+                # Header
+                csv_file.write('File,Scan ID,Series Num,Camera Num,Image Type,Aperture,ISO,Shutter,Directory\n')
+
+        scan_details = os.path.join(base_dir, 'scan_details.csv')
+        if not os.path.exists(scan_details):
+            # generate the scan details text file
+            with open(scan_details, 'w+') as csv_file:
+                # Camera Header
+                csv_file.write('Camera Details\nCam Position,Cam Model,Serial,Lens\n')
+                for cam in self.cameras:
+                    csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
+
+                # Scan Header
+                csv_file.write('\nScan Details\nScan ID,Number of Series,Scan Type,Object Type,Scan Notes,Scan Name,Generate 3D Model?\n')
 
 class ImageAssociation():
-    def __init__(self, file_path, camera, scan_name, series, image_type, aperture, ISO, shutter_speed):
+    def __init__(self, file_path, dir, camera, scan_name, series, image_type, aperture, ISO, shutter_speed):
         self.camera_number = camera
         self.scan_name = scan_name
         self.series = series
@@ -470,6 +524,7 @@ class ImageAssociation():
         self.ISO = ISO
         self.shutter_speed = shutter_speed
         self.file_path = file_path
+        self.dir = dir
 
     def __repr__(self):
         xstr = lambda v: '' if v is None else v
@@ -481,7 +536,8 @@ class ImageAssociation():
             xstr(self.image_type),
             xstr(self.aperture),
             xstr(self.ISO),
-            xstr(self.shutter_speed)
+            xstr(self.shutter_speed),
+            self.dir
         )
 
     
