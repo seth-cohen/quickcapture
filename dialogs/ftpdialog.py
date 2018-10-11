@@ -298,34 +298,35 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             camera_files = {}
             with open(os.path.join(base_dir, 'image_map.csv'), 'r') as image_csv:
                 images = image_csv.readlines()[1:]
-                for image in images.split(','):
+                for image_string in images:
+                    image = image_string.split(',')
                     cam_num = image[3]
-                    image_path = os.path.join(image[8], image[0])
+                    image_path = os.path.join(image[8].rstrip(), image[0])
                     if cam_num not in camera_files:
                         camera_files[cam_num] = []
 
                     camera_files[cam_num].append(image_path)
-            
-        for cam_num, camera in enumerate(self.cameras):
-            if camera.camera is not None:
-                files = camera.list_files()
-                if len(files) == 0:
-                    print('No files from latest scan on camera {}'.format(cam_num))
-                    continue
-                    
-                print(files)
-                camera_files[cam_num] = files
+        else:    
+            for camera in self.cameras:
+                if camera.camera is not None:
+                    files = camera.list_files()
+                    if len(files) == 0:
+                        print('No files from latest scan on camera {}'.format(camera.position))
+                        continue
 
-        for cam_num, file_list in camera_files.items():
-            thread = CopyThread(camera, file_list, base_dir)
+                    camera_files[str(camera.position)] = files
 
-            thread.log_update_signal.connect(self.update_log)
-            thread.progress_update_signal.connect(self.update_copy_progress)
-            thread.has_completed_signal.connect(self.handle_copy_thread_complete)
+        for camera in self.cameras:
+            if str(camera.position) in camera_files:
+                thread = CopyThread(camera, camera_files[str(camera.position)], base_dir)
 
-            thread.start()
-            print('Thread started')
-            self.copy_threads[cam_num] = thread
+                thread.log_update_signal.connect(self.update_log)
+                thread.progress_update_signal.connect(self.update_copy_progress)
+                thread.has_completed_signal.connect(self.handle_copy_thread_complete)
+
+                thread.start()
+                print('Thread started')
+                self.copy_threads[cam_num] = thread
 
         if len(self.copy_threads) == 0:
             Qtw.QMessageBox.critical(self, 'No Images', 'There are no images from the current scan')
@@ -473,6 +474,7 @@ class CopyThread(Qtc.QThread):
         self.camera = camera
         self.file_list = file_list
         self.base_dir = base_dir
+        print(file_list)
 
     def run(self):
         """The workhorse of the thread class

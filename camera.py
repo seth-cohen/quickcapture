@@ -75,7 +75,7 @@ class Camera():
             self.focus_mode = config.get_child_by_name('focusmode').get_value()
             self.shutter_speed = config.get_child_by_name('shutterspeed').get_value()
             self.shoot_mode = config.get_child_by_name('autoexposuremode').get_value()
-            self.counter = config.get_child_by_name('shuttercounter').get_value()
+            #self.counter = config.get_child_by_name('shuttercounter').get_value()
             self.available = config.get_child_by_name('availableshots').get_value()
             self.lens = config.get_child_by_name('lensname').get_value()
             self.model = config.get_child_by_name('cameramodel').get_value()
