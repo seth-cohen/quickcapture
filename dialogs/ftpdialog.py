@@ -51,6 +51,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         image_associations ([ImageAssociation]): List of all image associations taken as part of scan session
         scan_details (dict of str: [ScanDetails]): Dictionary of scans key is name of scan and value list of scan details
             tuple where first index is number of series and second is a string of notes/description of scan 
+        directory_override (str): This is set to upload any existing directory
 
     """
     def __init__(self, config, cameras, image_associations, scan_details, base_dir):
@@ -63,6 +64,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.image_associations = image_associations
         self.scan_details = scan_details
         self.base_dir = base_dir
+        self.directory_override = None
 
         path = os.path.dirname(os.path.abspath(__file__))
         logo_path = os.path.join(path, 'logo.png')
@@ -124,36 +126,39 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         )
 
         if dir:
+            self.directory_override = dir
+            self.copy_files_local(dir)
+
             # wait up to 5 seconds for ethernet to attach
-            self.update_log('Configuring Network')
-            Qtw.QApplication.processEvents()
+            #self.update_log('Configuring Network')
+            #Qtw.QApplication.processEvents()
 
-            start_time = time.time()
-            while time.time() - start_time < 5:
-                ethernet_state = subprocess.check_output('cat /sys/class/net/eth0/operstate', shell=True)
-                if ethernet_state.decode('utf-8').strip() == 'up':
-                    break
-                time.sleep(0.2)
+            #start_time = time.time()
+            #while time.time() - start_time < 5:
+            #    ethernet_state = subprocess.check_output('cat /sys/class/net/eth0/operstate', shell=True)
+            #    if ethernet_state.decode('utf-8').strip() == 'up':
+            #        break
+            #    time.sleep(0.2)
 
-            # wait up to 10 seconds for connection to network
-            # essentially try to ping google.com until it responds or
-            # 5 seconds passed
-            host = self.host.text()
-            self.update_log('Looking for {}'.format(host))
-            Qtw.QApplication.processEvents()
+            ## wait up to 10 seconds for connection to network
+            ## essentially try to ping google.com until it responds or
+            ## 5 seconds passed
+            #host = self.host.text()
+            #self.update_log('Looking for {}'.format(host))
+            #Qtw.QApplication.processEvents()
 
-            start_time = time.time()
-            while time.time() - start_time < 15:
-                ping = subprocess.check_output('ping -qc 1 {} > /dev/null && echo ok || echo error'.format(host), shell=True)
-                if ping.decode('utf-8').strip() == 'ok':
-                    self.update_log('Host Found')
-                    break
-                else:
-                    self.update_log('Connecting to {}...'.format(host))
-                    Qtw.QApplication.processEvents()
-                time.sleep(0.2)
+            #start_time = time.time()
+            #while time.time() - start_time < 15:
+            #    ping = subprocess.check_output('ping -qc 1 {} > /dev/null && echo ok || echo error'.format(host), shell=True)
+            #    if ping.decode('utf-8').strip() == 'ok':
+            #        self.update_log('Host Found')
+            #        break
+            #    else:
+            #        self.update_log('Connecting to {}...'.format(host))
+            #        Qtw.QApplication.processEvents()
+            #    time.sleep(0.2)
 
-            self.begin_ftp_transfer(dir)
+            #self.begin_ftp_transfer(dir)
         
     def update_log(self, text):
         self.status_log.append(text)
@@ -210,7 +215,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                     time.sleep(0.2)
 
                 Qtw.QApplication.processEvents()
-                self.begin_ftp_transfer()
+                self.begin_ftp_transfer(self.directory_override)
 
     @Qtc.pyqtSlot(str, str)
     def handle_ftp_thread_complete(self, key, remote_path):
@@ -275,7 +280,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.set_dialog_buttons_state(True)
         Qtw.QMessageBox.critical(self, 'FTP Error', error_message)
 
-    def copy_files_local(self):
+    def copy_files_local(self, dir=None):
         """Starts the process of copying files over from the camera to the Pi
 
         """
@@ -285,6 +290,22 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         os.makedirs(base_dir, exist_ok=True)
         
         self.status_log.append('Begin copying files')
+        camera_files = {}
+        if dir is not None:
+            # Grab image data from the image_map in the directory if we are
+            # transferring anything other than current scan data
+            base_dir = dir
+            camera_files = {}
+            with open(os.path.join(base_dir, 'image_map.csv'), 'r') as image_csv:
+                images = image_csv.readlines()[1:]
+                for image in images.split(','):
+                    cam_num = image[3]
+                    image_path = os.path.join(image[8], image[0])
+                    if cam_num not in camera_files:
+                        camera_files[cam_num] = []
+
+                    camera_files[cam_num].append(image_path)
+            
         for cam_num, camera in enumerate(self.cameras):
             if camera.camera is not None:
                 files = camera.list_files()
@@ -293,49 +314,25 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                     continue
                     
                 print(files)
-                thread = CopyThread(camera, files, base_dir)
+                camera_files[cam_num] = files
 
-                thread.log_update_signal.connect(self.update_log)
-                thread.progress_update_signal.connect(self.update_copy_progress)
-                thread.has_completed_signal.connect(self.handle_copy_thread_complete)
+        for cam_num, file_list in camera_files.items():
+            thread = CopyThread(camera, file_list, base_dir)
 
-                thread.start()
-                print('Thread started')
-                self.copy_threads[cam_num] = thread
+            thread.log_update_signal.connect(self.update_log)
+            thread.progress_update_signal.connect(self.update_copy_progress)
+            thread.has_completed_signal.connect(self.handle_copy_thread_complete)
+
+            thread.start()
+            print('Thread started')
+            self.copy_threads[cam_num] = thread
 
         if len(self.copy_threads) == 0:
             Qtw.QMessageBox.critical(self, 'No Images', 'There are no images from the current scan')
         else:
-            ## generate the image association file
-            #with open(os.path.join(base_dir, 'image_map.csv'), 'w+') as csv_file:
-            #    # Header
-            #    csv_file.write('File,Scan ID,Series Num,Camera Num,Image Type,Aperture,ISO,Shutter\n')
-            #    for image in self.image_associations:
-            #        csv_file.write(str(image))
-
-            # generate the scan details text file
-            #with open(os.path.join(base_dir, 'scan_details.csv'), 'w+') as csv_file:
-            #    # Camera Header
-            #    csv_file.write('Camera Details\nCam Position, Cam Model, Serial, Lens\n')
-            #    for cam in self.cameras:
-            #        csv_file.write('{},{},{},{}\n'.format(cam.position, cam.model, cam.serial_num, cam.lens))
-
-            #    # Scan Header
-            #    csv_file.write('\nScan Details\nScan ID,Number of Series,Scan Type,Object Type,Scan Notes,Scan Name,Generate 3D Model?\n')
-            #    for scan_name, part_details_list in self.scan_details.items():
-            #        num_parts = len(part_details_list)
-            #        for i, details in enumerate(part_details_list):
-            #            name_for_csv = scan_name
-            #            if i > 0:
-            #                name_for_csv += '-{}ofX'.format(i + 1) 
-            #            csv_file.write('{},{}\n'.format(name_for_csv, str(details)))
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):
-        base_dir = self.get_base_dir()
-        if dir is not None:
-            base_dir = dir
-
         # Create the base directory on the FTP server if it doesn't already exist_ok
         try:
             conn = get_ftp_connection(self.config)
@@ -433,7 +430,6 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         if len(self.copy_threads) == 0:
             self.set_dialog_buttons_state(False)
             self.copy_files_local()
-
 
     def reject(self):
         """Cancel button was pressed
