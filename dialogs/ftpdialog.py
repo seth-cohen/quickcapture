@@ -326,7 +326,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
 
                 thread.start()
                 print('Thread started')
-                self.copy_threads[cam_num] = thread
+                self.copy_threads[camera.position] = thread
 
         if len(self.copy_threads) == 0:
             Qtw.QMessageBox.critical(self, 'No Images', 'There are no images from the current scan')
@@ -334,6 +334,10 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):
+        base_dir = self.base_dir
+        if not dir is None:
+            base_dir = dir
+            
         # Create the base directory on the FTP server if it doesn't already exist_ok
         try:
             conn = get_ftp_connection(self.config)

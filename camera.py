@@ -196,7 +196,7 @@ class Camera():
 
     def get_file_info(self, path):
         folder, name = os.path.split(path)
-        print(folder, name)
+        print('cam_num', self.position, folder, name)
         return  self.camera.file_get_info(folder, name)
 
     def handle_image_save(self, file, directory, container):
