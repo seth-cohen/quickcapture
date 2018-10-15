@@ -291,10 +291,10 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         
         self.status_log.append('Begin copying files')
         camera_files = {}
-        if dir is not None:
+        if dir is not None and False:
             # Grab image data from the image_map in the directory if we are
             # transferring anything other than current scan data
-            base_dir = dir
+            base_dir = self.base_dir  # dir
             camera_files = {}
             with open(os.path.join(base_dir, 'image_map.csv'), 'r') as image_csv:
                 images = image_csv.readlines()[1:]
@@ -313,11 +313,12 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                     print('No files from latest scan on camera {}'.format(cam_num))
                     continue
                     
-                print(files)
+                print("camera", files)
+                print("csv", camera_files[cam_num])
                 camera_files[cam_num] = files
 
         for cam_num, file_list in camera_files.items():
-            thread = CopyThread(camera, file_list, base_dir)
+            thread = CopyThread(self.cameras[cam_num], file_list, base_dir)
 
             thread.log_update_signal.connect(self.update_log)
             thread.progress_update_signal.connect(self.update_copy_progress)
