@@ -33,6 +33,7 @@ class CameraTrigger():
             
         self.gpio.set_gpio(self.gpio_pin, direction)
 
+
 class Camera():
     def __init__(self, trigger_pin, serial_num, position, trigger_gpio_low=True, trigger_with_usb=False):
         # number of photos that this camera has taken since program start
@@ -75,7 +76,7 @@ class Camera():
             self.focus_mode = config.get_child_by_name('focusmode').get_value()
             self.shutter_speed = config.get_child_by_name('shutterspeed').get_value()
             self.shoot_mode = config.get_child_by_name('autoexposuremode').get_value()
-            #self.counter = config.get_child_by_name('shuttercounter').get_value()
+            self.counter = config.get_child_by_name('shuttercounter').get_value()
             self.available = config.get_child_by_name('availableshots').get_value()
             self.lens = config.get_child_by_name('lensname').get_value()
             self.model = config.get_child_by_name('cameramodel').get_value()
@@ -198,7 +199,7 @@ class Camera():
         folder, name = os.path.split(path)
         print('camera', self.camera)
         print('cam_num', self.position, folder, name)
-        return  self.camera.file_get_info(str(folder), name)
+        return self.camera.file_get_info(folder, name)
 
     def handle_image_save(self, file, directory, container):
         if container not in self.files:

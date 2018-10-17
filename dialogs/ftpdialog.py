@@ -126,37 +126,6 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         if dir:
             self.directory_override = dir
             self.copy_files_local(dir)
-
-            # wait up to 5 seconds for ethernet to attach
-            #self.update_log('Configuring Network')
-            #Qtw.QApplication.processEvents()
-
-            #start_time = time.time()
-            #while time.time() - start_time < 5:
-            #    ethernet_state = subprocess.check_output('cat /sys/class/net/eth0/operstate', shell=True)
-            #    if ethernet_state.decode('utf-8').strip() == 'up':
-            #        break
-            #    time.sleep(0.2)
-
-            ## wait up to 10 seconds for connection to network
-            ## essentially try to ping google.com until it responds or
-            ## 5 seconds passed
-            #host = self.host.text()
-            #self.update_log('Looking for {}'.format(host))
-            #Qtw.QApplication.processEvents()
-
-            #start_time = time.time()
-            #while time.time() - start_time < 15:
-            #    ping = subprocess.check_output('ping -qc 1 {} > /dev/null && echo ok || echo error'.format(host), shell=True)
-            #    if ping.decode('utf-8').strip() == 'ok':
-            #        self.update_log('Host Found')
-            #        break
-            #    else:
-            #        self.update_log('Connecting to {}...'.format(host))
-            #        Qtw.QApplication.processEvents()
-            #    time.sleep(0.2)
-
-            #self.begin_ftp_transfer(dir)
         
     def update_log(self, text):
         self.status_log.append(text)
@@ -289,7 +258,7 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         
         self.status_log.append('Begin copying files')
         camera_files = {}
-        if dir is not None or True:
+        if dir is not None:
             # Grab image data from the image_map in the directory if we are
             # transferring anything other than current scan data
             base_dir = base_dir if dir is None else dir
@@ -304,16 +273,16 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                         camera_files[cam_num] = []
 
                     camera_files[cam_num].append(image_path)
+        else:
+            # Just grab from the list of saved files in the camera instance
+            for camera in self.cameras:
+                if camera.camera is not None:
+                    files = camera.list_files()
+                    if len(files) == 0:
+                        print('No files from latest scan on camera {}'.format(camera.position))
+                        continue
 
-        for camera in self.cameras:
-            if camera.camera is not None:
-                files = camera.list_files()
-                if len(files) == 0:
-                    print('No files from latest scan on camera {}'.format(camera.position))
-                    continue
-
-                print('camera', camera.position, files)
-                print('csv', camera_files[str(camera.position)])
+                    camera_files[str(camera.position)] = files
 
         for camera in self.cameras:
             if str(camera.position) in camera_files:
@@ -333,10 +302,10 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):
-        base_dir = self.base_dir
-        if not dir is None:
+        base_dir = self.get_base_dir()
+        if dir is not None:
             base_dir = dir
-            
+
         # Create the base directory on the FTP server if it doesn't already exist_ok
         try:
             conn = get_ftp_connection(self.config)
@@ -349,11 +318,11 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
 
         # See if the directory already exists on the server, if not create it
         try:
-           server_list = conn.nlst()
-           server_dir = os.path.basename(base_dir)
-           if server_dir not in server_list:
-               print('create directory on server {}'.format(server_dir))
-               conn.mkd(server_dir)
+            server_list = conn.nlst()
+            server_dir = os.path.basename(base_dir)
+            if server_dir not in server_list:
+                print('create directory on server {}'.format(server_dir))
+                conn.mkd(server_dir)
         except ftp.all_errors as e:
             self.handle_ftp_error(str(e))
             return
