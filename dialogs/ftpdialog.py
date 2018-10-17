@@ -113,8 +113,6 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.ftp_threads = {}
 
     def upload_existing_directory(self):
-        # ensure that the ethernet USB controller is on
-        usbcontroller.turn_ethernet_on()
         options = Qtw.QFileDialog.Options()
 
         options |= Qtw.QFileDialog.ShowDirsOnly
@@ -291,10 +289,10 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         
         self.status_log.append('Begin copying files')
         camera_files = {}
-        if dir is not None and False:
+        if dir is not None or True:
             # Grab image data from the image_map in the directory if we are
             # transferring anything other than current scan data
-            base_dir = self.base_dir if dir is None else dir
+            base_dir = base_dir if dir is None else dir
             camera_files = {}
             with open(os.path.join(base_dir, 'image_map.csv'), 'r') as image_csv:
                 images = image_csv.readlines()[1:]
@@ -314,9 +312,8 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
                     print('No files from latest scan on camera {}'.format(camera.position))
                     continue
 
-                print('camera', files)
+                print('camera', camera.position, files)
                 print('csv', camera_files[str(camera.position)])
-                camera_files[str(camera.position)] = files
 
         for camera in self.cameras:
             if str(camera.position) in camera_files:
