@@ -40,20 +40,20 @@ CAMERA_SETTINGS_TAB_INDEX = 1
 class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
     """MainWindow is the top level GUI window running in the main thread
 
-    This QT5 QMainWindow offers functionality consisting of viewing image previews, 
+    This QT5 QMainWindow offers functionality consisting of viewing image previews,
     initiating scans or setup shots, and transfering data to the processing FTP servers
 
     Attributes:
         scans (dict of str: [ScanDetails]): Dictionary of scans key is name of scan and value is the scan details for each part
-            tuple where first index is number of series and second is a string of notes/description of scan 
+            tuple where first index is number of series and second is a string of notes/description of scan
         scan_name (str): Name of the current scan
         scan_part_id (str): Unique ID of the product being scanned. If a prop or experiment it defaults to scan name
         scan_part_count (int): Current part number of the current scan
         image_associations ([ImageAssociation]): List of ImageAssociations, mapping an image to the scan and photo type
         config (ConfigParser): Object to read and right application configuration
-    
+
     """
-    
+
     def __init__(self, splash):
         """Initializes all variables and state for the application and sets up the UI
 
@@ -85,7 +85,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
         splash.showMessage('Grabbing Camera Settings')
         self.refresh_camera_settings()
-        
+
         splash.showMessage('Setting Camera Preview Image')
         self.reset_previews()
 
@@ -102,7 +102,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                  'Open file explorer to "/home/pi/ and delete '
                  'the dated directories only (YYYYMMDD_XXXXXX)'.format(gigs_free))
             )
-        
+
     def setup_hardware(self):
         self.cameras = [];
         if 'DEFAULTS' in self.config and 'CAMERAS' in self.config:
@@ -124,7 +124,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 int(turntable_data.get('photosperscan', consts.DEFAULT_PHOTOS_PER_SCAN)),
                 float(turntable_data.get('delay', consts.DEFAULT_DELAY))
             )
-        
+
     def connect_ui(self):
         self.cam_counters = []
         self.cam_previews = []
@@ -142,7 +142,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 'counter': getattr(self, 'counter_{}'.format(i)),
                 'available': getattr(self, 'available_{}'.format(i))
             })
-        
+
         self.initialize_button.clicked.connect(self.initialization_shot)
         self.new_scan_button.clicked.connect(self.start_scan)
         self.ftp_button.clicked.connect(self.display_ftp)
@@ -172,10 +172,10 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                     available_text.setStyleSheet('')
             except ValueError:
                 pass
-               
+
     def reset_previews(self):
         """Place camera preview placeholder in place of the live feeds
-        
+
         """
         path = os.path.dirname(os.path.abspath(__file__))
         preview_image_path = os.path.join(path, 'cam_no_preview.png')
@@ -184,9 +184,9 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
 
     def generate_default_config(self):
         """Sets the known defaults for the config file.
-        
+
         If there is no pre-generated config file at ~/.wayscan.conf this method
-        should be called prior to completing initialization so that we can generate 
+        should be called prior to completing initialization so that we can generate
         the config file with appropriate default values
 
         """
@@ -210,7 +210,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             'ethernet': consts.DEFAULT_ETHERNET_USB_PORT,
             'camera_hub': consts.DEFAULT_CAMERA_HUB_USB_PORT
         }
-        
+
     def display_config(self):
         init = configdialog.ConfigDialog(self.config)
         # We want a modal dialog. exec_() will open the dialog Modally.
@@ -225,12 +225,12 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         print(self.base_dir)
         ftp = ftpdialog.FTPDialog(self.config, self.cameras, self.image_associations, self.scans, self.base_dir)
         if ftp.exec():
-            # reset camera counts etc.            
+            # reset camera counts etc.
             pass
-        
+
     def close(self):
         exit()
-        
+
     def start_scan(self):
         """Kicks off the scan processEvents
 
@@ -248,9 +248,9 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             self.create_files_if_necessary()
             self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
             self.scan_progress_container.show()
-            
+
             scan_name = dialog.scan_name
-            scan_part_id = dialog.part_id if dialog.part_id != '' else scan_name 
+            scan_part_id = dialog.part_id if dialog.part_id != '' else scan_name
             scan_notes = dialog.scan_notes
             object_type = dialog.object_type
             scan_type = dialog.scan_type
@@ -269,14 +269,14 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             if not dialog.is_additional_orientation:
                 if self.scan_part_count > 1:
                     self.scan_name_label.setText('{}{} (Part {})'.format(
-                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '',
                         scan_name,
                         self.scan_part_count
                     ))
                     self.scans[scan_part_id].append(ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model))
                 else:
                     self.scan_name_label.setText('{}{}'.format(
-                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '', 
+                        '[{}]: '.format(scan_part_id) if scan_part_id != scan_name else '',
                         scan_name
                     ))
                     self.scans[scan_part_id] = [ScanDetails(1, scan_type, object_type, scan_notes, scan_name, generate_3d_model)]
@@ -305,6 +305,16 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 self.perform_scan_cycle()
 
     def write_to_scan_details(self, overwrite_line=False):
+        """Write the current scan information to the csv file
+
+        Writes a new line, or overwrites the last line with the
+        information about the current scan. Last line should
+        be overwritten when adding a new series
+
+        Args:
+            overwrite_line (bool): Whether or not to overwrite the last line
+
+        """
         name_for_csv = self.scan_name
         if self.scan_part_count > 1:
             name_for_csv += '-{}ofX'.format(self.scan_part_count)
@@ -331,20 +341,22 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                 for line in lines:
                     csv_file.write(line)
 
-    def waiting_on_previews(self):
-        for cam in self.cameras:
-            if cam.thread is not None:
-                return True
-
-        return False
-            
     def update_scan_progress(self, current_scan):
+        """Updates progress of the scan
+
+        Args:
+            current_scan (str): Name of the current scan
+
+        """
         total_scans = self.turntable.photos_per_scan + 2
         self.total_scan_label.setText(str(total_scans))
         self.current_scan_label.setText(str(current_scan))
         self.scan_progress.setValue(100 * current_scan / total_scans)
-        
+
     def perform_scan_cycle(self):
+        """Initiates a scan cycle
+
+        """
         cam_list = range(len(self.cameras))
         print('~===-*^% Photos per scan {}'.format(self.turntable.photos_per_scan))
 
@@ -396,6 +408,21 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         print(self.scans)
 
     def show_message_box(self, button_text, title, text, informative_text=None, image=None, is_choice=False, no_button_text=None):
+        """Helper for displaying a messagebox
+
+        Args:
+            button_text (str): Text to display on the button
+            title (str): Title for the message box
+            text (str): Text to display on the message box
+            informative_text (str): Additional text to display on message box
+            image (str): Path to image to display on message box
+            is_choice (bool): Whether this is a yes/no message box or just information
+            no_button_text (str): Text to display on the no/cancel button
+
+        Returns:
+            bool: Return value from the messagebox
+
+        """
         msgbox = msgdialog.MessageDialog(
             button_text,
             title,
@@ -406,8 +433,16 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             no_button_text
         )
         return msgbox.exec_()
-        
+
     def take_photo_for_cams(self, which_cams, for_scan=False, type=None):
+        """Takes photos for each of the cameras
+
+        Args:
+            which_cams ([int]): List of camera numbers fo take pictures for_scan
+            for_scan (bool): Whether this photo is for scan or test
+            type (str): Type of image (scan, background, colorcard)
+
+        """
         # Name the bucket that we want to associate these images with
         association = 'initialization'
         self.textEdit.append('Triggering Cameras')
@@ -424,7 +459,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
         coroutines = []
         for cam_num in which_cams:
             coroutines.append(self.cameras[cam_num].take_photo(association))
-            
+
         loop = asyncio.get_event_loop()
         responses = loop.run_until_complete(asyncio.gather(*coroutines))
 
@@ -466,6 +501,9 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
                     csv_file.write(str(image))
 
     def initialization_shot(self):
+        """Takes initialization shot for all attached cameras
+
+        """
         self.create_files_if_necessary()
         # Set tab to camera preview tabWidget
         self.tabWidget.setCurrentIndex(THUMBNAIL_TAB_INDEX)
@@ -482,7 +520,7 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
     def update_config(self):
         """This method is called any time our configuration has changed
 
-        We need to update the application's conf file and also apply the configuration 
+        We need to update the application's conf file and also apply the configuration
         changes to ensure proper operation.
 
         """
@@ -491,6 +529,9 @@ class MainWindow(Qtw.QMainWindow, main.Ui_MainWindow):
             self.config.write(config_file)
 
     def create_files_if_necessary(self):
+        """Creates the required directory and CSV files
+
+        """
         # Make the base_dir now, so we can write image data to it realtime
         os.makedirs(self.base_dir, exist_ok=True)
 
@@ -526,6 +567,9 @@ class ImageAssociation():
         self.dir = dir
 
     def __repr__(self):
+        """How the object should be represented when casted to string
+
+        """
         xstr = lambda v: '' if v is None else v
         return '{},{},{},{},{},{},{},{},{}\n'.format(
             self.file_path,
@@ -539,7 +583,7 @@ class ImageAssociation():
             self.dir
         )
 
-    
+
 class ScanDetails():
     def __init__(self, num_series, scan_type, object_type, notes, scan_name, generate_3d_model):
         self.num_series = num_series
@@ -561,19 +605,19 @@ class ScanDetails():
             self.scan_name.replace('"', '""'),
             self.generate_3d_model
         )
-        
+
 
 def get_pixmap(name):
     path = os.path.dirname(os.path.abspath(__file__))
     image_path = os.path.join(path, name)
     return Qtg.QPixmap(image_path)
-    
+
 
 # I feel better having one of these
 def main():
     usbcontroller.turn_ethernet_off()
     atexit.register(usbcontroller.enable_all_usb)
-    
+
     # a new app instance
     consts.app = Qtw.QApplication(sys.argv)
     consts.app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
@@ -582,15 +626,15 @@ def main():
     splash = Qtw.QSplashScreen(splash_image)
     splash.show()
     consts.app.processEvents()
-    
+
     # the main GUI window
     form = MainWindow(splash)
     form.show()
     splash.finish(form)
-    
+
     # without this, the script exits immediately.
     sys.exit(consts.app.exec_())
- 
+
 # python bit to figure how who started This
 if __name__ == "__main__":
     main()
