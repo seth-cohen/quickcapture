@@ -113,6 +113,13 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         self.ftp_threads = {}
 
     def upload_existing_directory(self):
+        """Uploads any directory that the user specifies
+
+        User selects a directory to upload via folder open dialog
+        any images not already copied over from the cameras
+        will be and then the files will all be uploaded to the FTP server
+
+        """
         options = Qtw.QFileDialog.Options()
 
         options |= Qtw.QFileDialog.ShowDirsOnly
@@ -128,13 +135,33 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             self.copy_files_local(dir)
         
     def update_log(self, text):
+        """Update the log textarea
+
+        Args:
+            text (str): The text to append to the log
+
+        """
         self.status_log.append(text)
 
     def update_copy_progress(self, value, cam_num):
+        """Updates the progress bar for the copy thread
+
+        Args:
+            value (float): Value to set for the input (0 - 100)
+            cam_num (int): Which camera's progress bar to update
+
+        """
         self.progress_bars[cam_num].setValue(value)
 
-    def update_ftp_progress(self, value, key):
-        self.ftp_progress_bars[key].setValue(value)
+    def update_ftp_progress(self, value, cam_num):
+        """Updates the progress bar for the ftp thread
+
+        Args:
+            value (float): Value to set for the input (0 - 100)
+            cam_num (int): Which camera's progress bar to update
+
+        """
+        self.ftp_progress_bars[cam_num].setValue(value)
 
     @Qtc.pyqtSlot(int)
     def handle_copy_thread_complete(self, thread_num):
@@ -240,16 +267,29 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
 
     @Qtc.pyqtSlot()
     def handle_password_not_set(self):
+        """Slot to pop msgbox to indicate missing password
+
+        """
         Qtw.QMessageBox.critical(self, 'FTP Details', 'Please configure your FTP details')
         
     @Qtc.pyqtSlot(str)
     def handle_ftp_error(self, error_message):
+        """Slot to pop msgbox to indicate an FTP error
+
+        Args:
+            error_message (str): The message to display in the msgbox
+
+        """
         self.set_dialog_buttons_state(True)
         Qtw.QMessageBox.critical(self, 'FTP Error', error_message)
 
     def copy_files_local(self, dir=None):
         """Starts the process of copying files over from the camera to the Pi
 
+        Args:
+            dir (str): The directory that has the files that we want to 
+                transfer
+        
         """
         base_dir = self.get_base_dir()
         
@@ -302,6 +342,13 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
             self.existing_dir.setEnabled(False)
 
     def begin_ftp_transfer(self, dir=None):
+        """Initiates the process of transferring files to FTP servers
+
+        Args:
+            dir (str): The directory that has the files that we want to 
+                transfer
+        
+        """
         base_dir = self.get_base_dir()
         if dir is not None:
             base_dir = dir
@@ -423,23 +470,25 @@ class FTPDialog(Qtw.QDialog, ftpdialog_auto.Ui_FTPDialog):
         else:
             self.dialog_buttons.button(Qtw.QDialogButtonBox.Cancel).setEnabled(False)
             
+
 class CopyThread(Qtc.QThread):
-    # these need to be class variables
+    # These need to be class variables due to the way
+    # PyQt5 handles signals as meta objects. They 'magically' become
+    # instance variables in the constructor
     log_update_signal = Qtc.pyqtSignal(str)
     progress_update_signal = Qtc.pyqtSignal(int, int)
     has_completed_signal = Qtc.pyqtSignal(int)
+
     def __init__(self, camera, file_list, base_dir, parent=None):
         """Sets initial attribute values
         
         Args:
-            camera ${2:arg2}
-            file_list ${3:arg3}
-            base_dir ${4:arg4}
-            parent ${6:arg6} (default None)
+            camera (Camera): The camera that we need to copy files from
+            file_list ([str]): List of file paths on the camera to copy
+            base_dir (str): The local directory root to copy files into
+            parent (Qtc.QObject): The parent of the thread instance
 
         """
-
-    def __init__(self, camera, file_list, base_dir, parent=None):
         super().__init__(parent)
 
         self.is_canceled = False
@@ -656,7 +705,19 @@ class FTPDirectoryThread(Qtc.QThread):
             self.quit()
             self.wait()
 
+
 def get_ftp_connection(config):
+    """Get a connection to the FTP server
+
+    Grabs settings from config and returns a logged in connection
+
+    Args:
+        config (Object): The object returned from ConfigParser
+
+    Returns:
+        ftp.FTP: FTP connection object to interact with server
+
+    """
     ftp_settings = config['FTP']
     host = ftp_settings.get('host', consts.DEFAULT_FTP_HOST)
     username = ftp_settings.get('username', '')
@@ -673,6 +734,10 @@ def get_ftp_connection(config):
         raise NoPasswordError()
     return ftp.FTP(host, user=username, passwd=pw)
 
+
 class NoPasswordError(Exception):
+    """Exception for cases where password doesn't exist
+
+    """
     def __init__(self):
         Exception.__init__(self, 'No password set')
