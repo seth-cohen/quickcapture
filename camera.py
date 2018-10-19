@@ -260,8 +260,8 @@ class Camera():
         Saves the image in the files dictionary
 
         Args:
-        file (str): Name of the image file
-        directory (str): Name of the directory the file saved to on camera
+            file (str): Name of the image file
+            directory (str): Name of the directory the file saved to on camera
 
         Returns:
             dict: with file and directory name

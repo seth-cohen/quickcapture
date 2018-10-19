@@ -585,6 +585,9 @@ class ImageAssociation():
 
 
 class ScanDetails():
+    """Container class for values representing a scan
+
+    """
     def __init__(self, num_series, scan_type, object_type, notes, scan_name, generate_3d_model):
         self.num_series = num_series
         self.scan_type = scan_type
