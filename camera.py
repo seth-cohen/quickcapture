@@ -10,6 +10,14 @@ import gpiocontroller as gpio
 
 
 class CameraTrigger():
+    """Represents the trigger mechanism for a camera
+
+    Attributes:
+        gpio_pin (int): The gpio pin number (using wiringPi numbering)
+        trigger_gpio_low (bool): Whether to trigger on low input
+        gpio (GpioController): The GpioController singleton
+
+    """
     def __init__(self, gpio_pin, trigger_gpio_low=True):
         self.gpio_pin = int(gpio_pin)
         self.trigger_gpio_low = trigger_gpio_low
@@ -19,21 +27,42 @@ class CameraTrigger():
         self.turn_off_gpio()
 
     def trigger_on(self, duration):
+        """Set the trigger to on direction
+
+        Args:
+            duration (float): Time, in seconds, to set trigger on
+
+        """
         direction = gpio.LOW
         if not self.trigger_gpio_low:
             direction = gpio.HIGH
-            
+
         self.gpio.set_with_duration(self.gpio_pin, direction, duration)
         print(direction)
-        
+
     def turn_off_gpio(self):
+        """Set the trigger to off direction
+
+        """
         direction = gpio.HIGH
         if not self.trigger_gpio_low:
             direction = gpio.LOW
-            
+
         self.gpio.set_gpio(self.gpio_pin, direction)
 
+
 class Camera():
+    """The camera class, wraps the interactions with the physical camera
+
+    Attributes:
+        number_of_photos_taken (int): The number of photos the camera has taken
+        trigger (CameraTrigger): The trigger object for the camera
+        trigger_with_usb (bool): Whether to use USB or GPIO to trigger camera
+        position (int): Position of the camera in the rig (0 - top, 4 - bottom)
+        files (dict): Dictionary where key is name of scan, and value is
+            list of file names
+
+    """
     def __init__(self, trigger_pin, serial_num, position, trigger_gpio_low=True, trigger_with_usb=False):
         # number of photos that this camera has taken since program start
         self.number_of_photos_taken = 0
@@ -46,7 +75,6 @@ class Camera():
         self.position = position
 
         self.files = {}
-        self.thread = None
 
         self.aperture = 'N/A'
         self.ISO = 'N/A'
@@ -58,18 +86,21 @@ class Camera():
         self.lens = 'N/A'
         self.serial_num = serial_num
         self.model = 'N/A'
-        
+
         print('Cam on pin {} has serial number {}'.format(trigger_pin, serial_num))
-        if not serial_num is None:
+        if serial_num is not None:
             self.camera = cf.CameraFactory.get_instance().get_camera(serial_num)
             self.load_config_settings()
         else:
             self.camera = None
-            
+
     def load_config_settings(self):
+        """Load the camera and shutter configurations
+
+        """
         if self.camera is not None:
             config = self.camera.get_config()
-            
+
             self.aperture = config.get_child_by_name('aperture').get_value()
             self.ISO = config.get_child_by_name('iso').get_value()
             self.focus_mode = config.get_child_by_name('focusmode').get_value()
@@ -79,17 +110,18 @@ class Camera():
             self.available = config.get_child_by_name('availableshots').get_value()
             self.lens = config.get_child_by_name('lensname').get_value()
             self.model = config.get_child_by_name('cameramodel').get_value()
-            
+
     async def take_photo(self, container=None):
         """Takes the actual photo
 
 
-        Triggers the camera either via USB or gpio pins. This is a coroutine called
-        via asyncio, so that multiple cameras can take photos at the same time without being blocked
-        returns the folder and name of the photo as saved on the device
+        Triggers the camera either via USB or gpio pins. This is a coroutine
+        called via asyncio, so that multiple cameras can take photos at the
+        same time without being blocked returns the folder and name of the
+        photo as saved on the device
 
         Args:
-            container (str): The key that we want to associate the image with 
+            container (str): The key that we want to associate the image with
                 typically the name of the scan or 'initialization'
 
         """
@@ -117,7 +149,7 @@ class Camera():
 
         Cameras stream out a series of events while performing certain actions. There is a blocking
         call in the libgphoto2 library that can wait for the events to be emitted. This coroutine
-        can run asynchronously to listen to events, specifically the file added event to 
+        can run asynchronously to listen to events, specifically the file added event to
         know when images are actually saved.
 
         """
@@ -138,7 +170,7 @@ class Camera():
             self.number_of_photos_taken += 1
 
         return (file_name, folder)
-            
+
     async def clear_events(self, wait_time=2.0):
         """Clear as many of the events as we can for the specified time
 
@@ -159,6 +191,17 @@ class Camera():
         return True
 
     def get_preview(self, file, folder):
+        """Gets a preview (thumbnail) of the image requested
+
+        Args:
+            file (str): Name of the image that we want preview of
+            folder (str): Name of the folder that the image was saved to
+                in the camera filesystem
+
+        Returns:
+            bytes: Image file data
+
+        """
         try:
             print('\t----==== Grabbing Thumbnail for cam {}, file {} ====----'.format(self.position, file))
             start = time.time()
@@ -168,10 +211,13 @@ class Camera():
             return data
         except Exception as e:
             print(e)
-             
+
         return None
 
     def get_lens_preview(self):
+        """Gets a preview from the current camera sensor data
+
+        """
         try:
             print('\t----==== Grabbing Preview for cam {} ====----'.format(self.position))
             start = time.time()
@@ -195,11 +241,32 @@ class Camera():
         return None
 
     def get_file_info(self, path):
+        """Get info from the image on the camera
+
+        Args:
+            path (str): Full path to the image on the camera
+
+        Returns:
+            gphoto2.CameraFileInfo: Info on the requested image
+
+        """
         folder, name = os.path.split(path)
-        print(folder, name)
-        return  self.camera.file_get_info(folder, name)
+        print('cam_num', self.position, folder, name)
+        return self.camera.file_get_info(folder, name)
 
     def handle_image_save(self, file, directory, container):
+        """Handles the image save actions
+
+        Saves the image in the files dictionary
+
+        Args:
+            file (str): Name of the image file
+            directory (str): Name of the directory the file saved to on camera
+
+        Returns:
+            dict: with file and directory name
+
+        """
         if container not in self.files:
             self.files[container] = []
 
@@ -207,15 +274,24 @@ class Camera():
         if len(file) > 0 and len(directory) > 0:
             self.files[container].append(os.path.join(directory, file))
             save_details['file'] = file
-            save_details ['dir'] = directory
+            save_details['dir'] = directory
 
         return save_details
-        
+
     def list_all_files(self, path='/'):
+        """Recursively list all files on the camera
+
+        Args:
+            path (str): Directory to recurse
+
+        Returns:
+            list: List of all files in directory and subdirectories
+
+        """
         result = []
         if self.camera is None:
             return result
-        
+
         # get files
         for name, value in self.camera.folder_list_files(path):
             result.append(os.path.join(path, name))
@@ -230,5 +306,7 @@ class Camera():
         return result
 
     def list_files(self):
-        return [image for images in self.files.values() for image in images]
+        """List all files taken in current session
 
+        """
+        return [image for images in self.files.values() for image in images]

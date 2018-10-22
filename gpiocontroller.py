@@ -1,10 +1,10 @@
-import time
 import threading
 import wiringpi as wpi
 
 OUTPUT = wpi.OUTPUT
 HIGH = wpi.HIGH
 LOW = wpi.LOW
+
 
 class GpioController():
     __instance = None
